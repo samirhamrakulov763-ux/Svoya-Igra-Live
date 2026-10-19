@@ -1,0 +1,13 @@
+{
+  "name": "svoya-igra-live",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Realtime quiz game with host control and animated scoreboard",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check public/app.js"
+  }
+}

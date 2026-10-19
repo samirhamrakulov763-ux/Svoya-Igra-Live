@@ -1,0 +1,9 @@
+RENDER DEPLOYMENT / Svoya Igra
+
+- Deploy as a Render Web Service with runtime Node.js, plan Free, build command: npm install, start command: npm start.
+- Set HOST_PIN to a NEW 8-12 digit code in Render environment settings. Never commit the PIN or data/config.json.
+- Node automatically binds to the PORT environment variable provided by Render.
+- Your source must be in a Git repository which Render can clone.
+- On Render Free the filesystem is ephemeral: changed questions, players and scores can disappear after redeploy, service restart or suspension. For dependable persistence an external database must be implemented/connected or a persistent disk used on a paid plan.
+- Free instances may spin down when idle, so reconnecting can be slow.
+- For a public service, use a sufficiently long and private HOST_PIN.

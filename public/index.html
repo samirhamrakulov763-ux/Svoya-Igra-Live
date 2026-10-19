@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#08111f"/>
+  <title>Своя игра — Live Quiz</title>
+  <link rel="stylesheet" href="/style.css"/>
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark"><span>✦</span></div>
+        <div class="brand-copy"><div class="brand-title">СВОЯ <em>ИГРА</em></div><div class="brand-sub">THE ULTIMATE QUIZ EXPERIENCE</div></div>
+      </div>
+      <div class="center-status"><span class="live-dot"></span><span id="connection">ПОДКЛЮЧЕНИЕ</span><span class="separator"></span><span>РАУНД <b id="roundNo">01</b></span></div>
+      <div class="top-actions"><span id="identity" class="identity">Гость</span><button id="openHost" class="ghost-btn small">◈ Ведущий</button><button id="openJoin" class="gold-btn small">Присоединиться <span>↗</span></button></div>
+    </header>
+    <div class="broadcast-strip"><div class="broadcast-strip-left"><span class="strip-symbol">✳</span><span>QUIZ NIGHT / <b>VOL. 01</b></span><span class="strip-line"></span><span>БОЛЬШАЯ ИГРА НАЧИНАЕТСЯ ЗДЕСЬ</span></div><div class="broadcast-strip-right"><span class="strip-wave">▂▄▆█▆▄▂</span> ON AIR <span class="strip-tiny">/ 2026</span></div></div>
+    <div class="content">
+      <div class="content-head">
+        <div><div class="eyebrow"><span class="dash"></span> ИНТЕЛЛЕКТУАЛЬНОЕ ШОУ <span class="tiny-star">✦</span> ИГРА В РЕАЛЬНОМ ВРЕМЕНИ</div><h1 id="gameTitle">Своя <i>игра.</i></h1><div class="subtitle"><span class="subtitle-accent">◆</span> Выбирай категорию. Рискуй. Забирай победу.</div><div class="hero-motto">ЗНАНИЯ <span>×</span> РИСК <span>×</span> ПОБЕДА</div></div>
+        <div class="game-meta"><div><span>КАТЕГОРИЙ</span><b id="categoryCount">05</b></div><div><span>ОСТАЛОСЬ</span><b id="questionCount">25</b></div><div><span>ИГРОКОВ</span><b id="playerCount">00</b></div></div>
+      </div>
+      <div id="mainLayout" class="main-layout">
+        <main class="play-area">
+          <div class="section-line"><div><span class="section-marker">01</span><span>ИГРОВОЕ ПОЛЕ</span></div><span id="boardHint" class="section-hint">ВЫБЕРИТЕ ВОПРОС, ЧТОБЫ НАЧАТЬ</span></div>
+          <div class="board-shell"><div class="board-shell-top"><div class="board-shell-title"><span class="board-shell-diamond">◆</span> THE GAME BOARD <span class="board-shell-sep">/</span> <span class="board-shell-light">ВЫБЕРИ СВОЙ ВЫЗОВ</span></div><div class="board-shell-deco"><span></span><span></span><span></span></div></div><div id="board" class="board" aria-label="Игровое поле"></div><div class="board-shell-bottom"><span>✦</span> <span>ВРЕМЯ ПОКАЗАТЬ, НА ЧТО ТЫ СПОСОБЕН</span><span class="board-shell-bottom-right">EST. 2026 / QUIZ CLUB</span></div></div>
+          <div class="under-board"><span class="legend-mark">✧</span><span>Самые смелые выбирают высокие ставки.</span><span id="usedStat">0 / 25 СЫГРАНО</span></div><div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
+          <div id="questionStage" class="question-stage hidden" aria-live="polite">
+            <div class="question-glow"></div><div class="stage-ornament" aria-hidden="true"><span>✧</span></div><div class="stage-edge stage-edge-a"></div><div class="stage-edge stage-edge-b"></div>
+            <div class="question-stage-top"><span class="q-top-label">ВОПРОС РАУНДА</span><span id="stageCategory">КАТЕГОРИЯ</span><span class="q-top-mark">✦</span></div>
+            <div id="questionValue" class="question-value">300 <small>ОЧКОВ</small></div>
+            <div class="question-divider"></div>
+            <div id="questionText" class="question-text"></div>
+            <div id="answerText" class="answer-text hidden"></div>
+            <div class="question-foot"><span id="answeringText">ВЫБИРАЕМ ИГРОКА</span><div id="timerPill" class="timer-pill hidden">◷ <span id="timerNum">30</span> сек</div></div><div id="stageClockTrack" class="stage-clock-track hidden"><div id="stageClockFill"></div></div>
+          </div>
+          <div class="section-line scoreboard-label"><div><span class="section-marker">02</span><span>ТАБЛИЦА ЛИДЕРОВ</span></div><span class="section-hint">LIVE SCOREBOARD</span></div>
+          <div id="scoreboard" class="scoreboard"></div>
+          <div class="footer-note"><span>✦</span> СОЗДАНО ДЛЯ ЯРКИХ ИГР И БОЛЬШИХ ПОБЕД <span>✦</span></div>
+        </main>
+        <aside id="hostPanel" class="host-panel hidden">
+          <div class="panel-heading"><div class="panel-icon">♛</div><div><div class="panel-title">Пульт ведущего</div><div class="panel-sub">УПРАВЛЕНИЕ ЭФИРОМ <span class="host-label-mini">• CONTROL ROOM</span></div></div><span class="panel-online"></span></div>
+          <div class="tab-bar"><button class="tab active" data-tab="control">Пульт</button><button class="tab" data-tab="editor">Редактор</button><button class="tab" data-tab="settings">Игра</button></div>
+          <div id="tabControl" class="panel-body">
+            <div class="panel-label">ТЕКУЩИЙ ВОПРОС <span id="currentState">НЕТ</span></div>
+            <div id="currentInfo" class="current-info">Выберите вопрос на игровом поле, чтобы начать.</div>
+            <div class="panel-label">КТО ОТВЕЧАЕТ</div><div id="playerPicker" class="player-picker"></div>
+            <div class="decision-row"><button id="correctBtn" class="decision correct" disabled><span class="decision-icon">✓</span><span>Правильно<small id="correctAmount">+300 ОЧКОВ</small></span></button><button id="wrongBtn" class="decision wrong" disabled><span class="decision-icon">✕</span><span>Неправильно<small id="wrongAmount">−300 ОЧКОВ</small></span></button></div>
+            <div class="action-grid"><button id="skipBtn" class="action-btn" disabled>→ Следующий</button><button id="revealBtn" class="action-btn" disabled>◉ Показать ответ</button><button id="timerBtn" class="action-btn" disabled>◷ Таймер 30с</button><button id="closeBtn" class="action-btn" disabled>□ Завершить вопрос</button></div>
+            <button id="undoBtn" class="undo-btn">↶ Отменить последнее начисление</button>
+            <div class="panel-label with-space">ИЗМЕНЕНИЕ БАЛЛОВ ВРУЧНУЮ</div><div class="manual-row"><select id="manualPlayer"><option value="">Игрок</option></select><input id="manualDelta" type="number" placeholder="+ / −" value="100"/><button id="manualApply" class="gold-square">✓</button></div>
+          </div>
+          <div id="tabEditor" class="panel-body hidden">
+            <div class="panel-label">КАТЕГОРИИ И ВОПРОСЫ</div>
+            <label class="field-label" for="editCategory">Категория</label><select id="editCategory" class="full-input"></select>
+            <div class="inline-field"><input id="categoryName" type="text" placeholder="Новая категория"/><button id="addCategory" class="gold-square" title="Добавить категорию">+</button><button id="renameCategory" class="flat-square" title="Переименовать выбранную">✎</button><button id="deleteCategory" class="flat-square danger-text" title="Удалить категорию">×</button></div>
+            <label class="field-label" for="editQuestion">Вопрос</label><select id="editQuestion" class="full-input"><option value="">Новый вопрос</option></select>
+            <label class="field-label" for="editPoints">Стоимость вопроса</label><select id="editPoints" class="full-input"><option>100</option><option>200</option><option>300</option><option>400</option><option>500</option><option>600</option><option>700</option><option>800</option><option>900</option><option>1000</option></select>
+            <label class="field-label" for="editText">Текст вопроса</label><textarea id="editText" placeholder="Напишите вопрос..." rows="4"></textarea>
+            <label class="field-label" for="editAnswer">Правильный ответ (только для ведущего)</label><textarea id="editAnswer" placeholder="Введите правильный ответ..." rows="3"></textarea>
+            <div class="editor-actions"><button id="saveQuestion" class="gold-btn wide">Сохранить вопрос</button><button id="newQuestion" class="action-btn">Новый</button><button id="deleteQuestion" class="action-btn danger-text">Удалить</button></div>
+            <div class="editor-hint">Вопросы сохраняются автоматически на этом компьютере. Изменения сразу видны всем игрокам.</div>
+          </div>
+          <div id="tabSettings" class="panel-body hidden">
+            <div class="panel-label">НАСТРОЙКИ КОМНАТЫ</div>
+            <label class="field-label" for="titleInput">Название игры</label><div class="inline-field"><input id="titleInput" placeholder="Своя игра"/><button id="saveTitle" class="gold-square">✓</button></div>
+            <div class="info-box"><span>◈</span><div><strong>Присоединение игроков</strong><p>Игрокам достаточно открыть ссылку и ввести имя. Никаких аккаунтов.</p><div id="joinAddress" class="address"></div><button id="copyAddress" class="action-btn">Копировать ссылку</button></div></div>
+            <div class="panel-label with-space">УЧАСТНИКИ</div><div id="memberList" class="member-list"></div>
+            <div class="panel-label with-space">УПРАВЛЕНИЕ РАУНДОМ</div>
+            <button id="nextRound" class="action-btn full">↗ Следующий раунд (вернуть вопросы)</button>
+            <button id="resetGame" class="action-btn full danger-text">↻ Новая игра: сбросить очки и вопросы</button>
+            <button id="logoutBtn" class="undo-btn">Выйти из режима ведущего</button>
+          </div>
+        </aside>
+      </div>
+    </div>
+    <footer class="bottom-bar"><span>✦ СВОЯ ИГРА <small>© LIVE QUIZ</small></span><div><span id="footerStatus">ОЖИДАНИЕ УЧАСТНИКОВ</span><span class="footer-divider"></span>ИГРАЙ. ДУМАЙ. ПОБЕЖДАЙ.</div></footer>
+  </div>
+  <div id="flashLayer" class="flash-layer" aria-hidden="true"></div>
+  <div id="toastArea" class="toast-area"></div>
+  <div id="modalCover" class="modal-cover hidden">
+    <div class="modal-card"><button id="closeModal" class="modal-close" aria-label="Закрыть">×</button><div class="modal-sigil">✦</div><div id="modalTitle" class="modal-title">Добро пожаловать</div><div id="modalSubtitle" class="modal-sub">Введи своё имя и присоединяйся к игре.</div>
+      <form id="modalForm"><label id="modalLabel" class="field-label" for="modalInput">ВАШЕ ИМЯ</label><input id="modalInput" autocomplete="off" maxlength="30" required placeholder="Например, Самирбек"/><button id="modalSubmit" class="gold-btn wide" type="submit">Начать игру <span>↗</span></button></form>
+      <p id="modalFooter" class="modal-footer">Никакой регистрации — только имя и игра.</p>
+    </div>
+  </div>
+</body>
+</html>

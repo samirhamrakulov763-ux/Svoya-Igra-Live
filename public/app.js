@@ -5,7 +5,7 @@ const fmt=n=>new Intl.NumberFormat('ru-RU').format(n);
 let state=null,ev=null,modalMode='join',activeTab='control',editorQuestionId='',editingCategoryId='',lastQuestionId='',lastEffect=null;
 let myId=localStorage.getItem('svo_player_id')||'';
 let myToken=localStorage.getItem('svo_player_token')||'';
-let lastScores=new Map(),isFirstRender=true,modalDismissed=false;
+let lastScores=new Map(),isFirstRender=true,modalDismissed=false,lastDecisionKeyAt=0;
 const setText=(id,value)=>{$(id).textContent=String(value);};
 const all=['100','200','300','400','500'];
 function toast(message,error=false){
@@ -46,7 +46,11 @@ function openModal(mode){
   $('modalInput').placeholder=host?'Введите PIN ведущего':'Например, Самирбек';
   $('modalInput').autocomplete=host?'off':'nickname';
   $('modalSubmit').innerHTML=host?'Открыть пульт <span>↗</span>':'Присоединиться <span>↗</span>';
-  setText('modalFooter',host?'PIN хранится только на компьютере ведущего.':'Без пароля, аккаунта и постоянной регистрации.');
+  setText('modalFooter',host?'Ведущему нужен секретный PIN-код.':'Без пароля, аккаунта и постоянной регистрации.');
+  $('choosePlayer').classList.toggle('selected',!host);
+  $('chooseHost').classList.toggle('selected',host);
+  $('choosePlayer').setAttribute('aria-pressed',String(!host));
+  $('chooseHost').setAttribute('aria-pressed',String(host));
   setTimeout(()=>$('modalInput').focus(),70);
 }
 function closeModal(){modalDismissed=true;$('modalCover').classList.add('hidden');}
@@ -64,6 +68,8 @@ document.addEventListener('click',e=>{
   }
 });
 $('openJoin').onclick=()=>{document.body.classList.remove('menu-open');openModal('join');};
+$('choosePlayer').onclick=()=>openModal('join');
+$('chooseHost').onclick=()=>openModal('host');
 $('closeModal').onclick=closeModal;
 $('modalCover').addEventListener('click',e=>{if(e.target===$('modalCover'))closeModal();});
 document.addEventListener('keydown',e=>{
@@ -71,6 +77,16 @@ document.addEventListener('keydown',e=>{
     if(!$('modalCover').classList.contains('hidden'))closeModal();
     else if(document.body.classList.contains('panel-open'))document.body.classList.remove('panel-open');
     else document.body.classList.remove('menu-open');
+  }
+  if(state?.host&&!e.repeat&&!e.ctrlKey&&!e.altKey&&!e.metaKey &&
+     $('modalCover').classList.contains('hidden') &&
+     !e.target.closest('input,textarea,select,[contenteditable="true"]') &&
+     state.active&&!state.active.finished&&state.active.playerId){
+    const key=(e.key==='1'||e.code==='Numpad1')?'correct':(e.key==='0'||e.code==='Numpad0')?'wrong':null;
+    if(key){
+      e.preventDefault();
+      if(Date.now()-lastDecisionKeyAt>650){lastDecisionKeyAt=Date.now();send({type:key});}
+    }
   }
   if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==='h'){
     e.preventDefault();if(state?.host)document.body.classList.toggle('panel-open');else openModal('host');
@@ -162,8 +178,30 @@ function renderStage(){
   setText('answerText',show&&active.reveal?(q.answer||''):'');
   const p=state.players.find(p=>p.id===active.playerId);
   setText('answeringText',active.finished?'ВОПРОС ЗАВЕРШЁН':p?'ОТВЕЧАЕТ: '+p.name.toUpperCase():'ВЕДУЩИЙ ВЫБИРАЕТ ИГРОКА');
-  updateTimer();
+  updateTimer();renderBuzz();
 }
+let buzzBusy=false;
+function renderBuzz(){
+  const a=state?.active,area=$('buzzArea'),btn=$('buzzBtn'),status=$('buzzStatus');
+  const me=state?.players.find(p=>p.id===myId);
+  if(!a||a.finished||!me||state.host){area.classList.add('hidden');return;}
+  area.classList.remove('hidden');
+  const tried=(a.triedIds||[]).includes(me.id);
+  const position=(a.buzzQueue||[]).indexOf(me.id)+1;
+  const mine=a.playerId===me.id;
+  const unavailable=tried||mine||position>0||a.reveal;
+  btn.disabled=unavailable||buzzBusy;
+  btn.classList.toggle('buzz-active',mine);
+  btn.textContent=mine?'✓ ТЫ ОТВЕЧАЕШЬ':tried?'✕ ТЫ УЖЕ ОТВЕЧАЛ':position?'⌛ ТЫ В ОЧЕРЕДИ':a.reveal?'ВОПРОС ЗАВЕРШЁН':'⚡ ОТВЕТИТЬ ПЕРВЫМ';
+  status.textContent=mine?'Отвечай вслух — ведущий оценит твой ответ':tried?'Дождись следующего вопроса':position?'Место в очереди: '+position+' — жди своей очереди':a.playerId?'Нажми, чтобы встать в очередь на ответ':'Нажми первым — отвечать будешь ты';
+}
+$('buzzBtn').onclick=async()=>{
+  if(buzzBusy||!myId||!myToken||state?.host||!state?.active)return;
+  buzzBusy=true;renderBuzz();
+  try{await request('/api/buzz',{playerId:myId,token:myToken});}
+  catch(e){toast(e.message,true);}
+  finally{buzzBusy=false;renderBuzz();}
+};
 function animateNumber(node,start,end){
   const duration=800,startTime=performance.now();
   const step=now=>{if(!node.isConnected)return;const progress=Math.min(1,(now-startTime)/duration),ease=1-Math.pow(1-progress,3);
@@ -202,7 +240,7 @@ function handleEffect(e){
     content.append(dom('div','effect-symbol',good?'✓':'✕'));
     content.append(dom('div','effect-title',good?'ВЕРНО!':'НЕВЕРНО!'));
     content.append(dom('div','effect-sub',(e.name||'ИГРОК').toUpperCase()+'  '+(e.delta>0?'+':'')+fmt(e.delta)));
-    if(!good&&e.nextName)content.append(dom('div','effect-sub','СЛЕДУЮЩИЙ: '+e.nextName.toUpperCase()));
+    if(!good)content.append(dom('div','effect-sub',e.nextName?'СЛЕДУЮЩИЙ: '+e.nextName.toUpperCase():'ОЖИДАЕМ НОВОГО НАЖАТИЯ'));
     layer.append(curtain,content);setTimeout(()=>{if(layer.contains(content))layer.replaceChildren();},1750);
   }else if(e.kind==='join'){toast('К игре присоединился '+e.name);}
   else if(e.kind==='round')toast('Раунд '+e.round+' начинается!');
@@ -220,6 +258,10 @@ function renderControl(){
   $('correctAmount').textContent='+'+fmt(q?.points||0)+' ОЧКОВ';
   $('wrongAmount').textContent='−'+fmt(q?.points||0)+' ОЧКОВ';
   const picker=$('playerPicker');picker.replaceChildren();
+  if(a&&!a.finished){
+    const note=dom('div','editor-hint','Очередь: '+((a.buzzQueue||[]).map(id=>state.players.find(p=>p.id===id)?.name).filter(Boolean).join(' → ')||'пока пусто'));
+    picker.append(note);
+  }
   for(const p of state.players){
     const btn=dom('button','picker-btn'+(a?.playerId===p.id?' selected':''),p.name);
     btn.disabled=!q||a.finished;btn.onclick=()=>send({type:'selectPlayer',playerId:p.id});picker.append(btn);

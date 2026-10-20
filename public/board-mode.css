@@ -156,3 +156,45 @@ body.panel-open .host-panel:not(.hidden){transform:translateX(0)}
 /* Guest tiles must stay bright even though only the host may click them. */
 .q-tile:disabled:not(.used){opacity:1!important;filter:none!important}
 .q-tile.used{opacity:.72!important;filter:none!important}
+
+/* Role selector during sign-in */
+.role-chooser{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 15px}
+.role-choice{background:#1151b1;color:#e3efff;border:2px solid #508df1;border-radius:12px;
+  font:800 15px Outfit,Manrope,sans-serif;min-height:50px;transition:background-color .18s,border-color .18s}
+.role-choice:hover{background:#226fda}
+.role-choice.selected{background:#ffcc24;border-color:#ffdf71;color:#092d77}
+.role-choice:focus-visible{outline:3px solid white;outline-offset:2px}
+.modal-card .modal-sub{margin-bottom:16px}
+.modal-card .field-label{margin-top:7px}
+.modal-sigil{margin-bottom:13px}
+
+/* Answer buzzer — only shown to a registered player while a question is live */
+.buzz-area{display:flex;flex-direction:column;align-items:center;gap:9px;max-width:90%;
+  margin:0 auto 16px;z-index:3;animation:questionAppear .25s ease}
+.buzz-btn{width:min(570px,90vw);min-height:76px;border:3px solid #ffe86f;
+  background:#ffcc24;color:#082e78;border-radius:14px;
+  font:900 clamp(17px,2.5vw,29px)/1.12 Outfit,Manrope,sans-serif;
+  letter-spacing:.6px;box-shadow:0 7px 0 #ca9219,0 12px 30px #061e6a88;
+  transition:transform .13s,background-color .13s,box-shadow .13s;cursor:pointer}
+.buzz-btn:not(:disabled):hover{background:#ffe171;transform:translateY(-3px);
+  box-shadow:0 10px 0 #ca9219,0 17px 32px #061e6a8a}
+.buzz-btn:not(:disabled):active{transform:translateY(5px);box-shadow:0 2px 0 #b78418}
+.buzz-btn:disabled{opacity:.98;cursor:default;box-shadow:none;background:#165dc2;color:#dbebff;border-color:#69a1e6}
+.buzz-btn.buzz-active{background:#087e5a;color:#fff;border-color:#76ecc0;box-shadow:0 0 25px #16ef9a45}
+.buzz-status{font:700 clamp(11px,1.45vw,15px) Manrope,sans-serif;line-height:1.4;
+  color:#f3f8ff;text-align:center;max-width:580px}
+.question-stage{gap:10px}
+.question-foot{flex-shrink:0}
+.shortcut-hint{color:#a9c2e4;font:700 11px Manrope,sans-serif;line-height:1.6;
+  text-align:center;margin:0 0 13px;padding:8px;background:#17345b;border:1px solid #41659c;border-radius:10px}
+.shortcut-hint kbd{display:inline-block;min-width:29px;border-radius:6px;border:1px solid #efb85d;
+  background:#ffcc24;color:#072d72;font:900 15px Outfit,sans-serif;padding:4px 8px;margin:0 2px}
+@media(max-width:680px){
+ .buzz-area{max-width:100%;margin:0 auto 9px}
+ .buzz-btn{width:min(92vw,460px);min-height:68px}
+ .buzz-status{font-size:12px}
+ .question-stage{padding:20px 12px!important}
+ .question-value{margin-top:3vh!important;font-size:clamp(48px,13vw,82px)!important}
+ .question-text{font-size:clamp(19px,5.5vw,30px)!important;margin:8px 0!important}
+ .question-stage-top{font-size:10px}
+}

@@ -116,13 +116,16 @@ function action(body){
       const q=question(body.questionId);
       if(q.used)fail(400,'Этот вопрос уже сыгран');
       const playerId=game.players.some(p=>p.id===body.playerId)?body.playerId:(game.players[0]?.id||null);
-      game.active={questionId:q.id,playerId,reveal:false,finished:false,openedAt:Date.now(),timerEnd:null};
+      game.active={questionId:q.id,playerId:game.players.some(p=>p.id===body.playerId)?body.playerId:null,buzzQueue:[],triedIds:[],reveal:false,finished:false,openedAt:Date.now(),timerEnd:null};
       effect={kind:'open',questionId:q.id,points:q.points,at:Date.now()};
       break;
     }
     case 'selectPlayer': {
       if(!game.active||game.active.finished)fail(400,'Нет активного вопроса');
-      const p=player(body.playerId);game.active.playerId=p.id;
+      const p=player(body.playerId);
+      if((game.active.triedIds||[]).includes(p.id))fail(400,'Этот игрок уже отвечал неправильно');
+      game.active.buzzQueue=(game.active.buzzQueue||[]).filter(id=>id!==p.id);
+      game.active.playerId=p.id;
       effect={kind:'select',playerId:p.id,name:p.name,at:Date.now()};break;
     }
     case 'correct': {
@@ -137,16 +140,22 @@ function action(body){
       if(!game.active.playerId)fail(400,'Сначала выберите игрока');
       const p=player(game.active.playerId),q=question(game.active.questionId);
       p.score-=q.points;
-      const index=game.players.findIndex(x=>x.id===p.id);
-      const next=game.players.length>1?game.players[(index+1)%game.players.length]:null;
-      game.active.playerId=next?.id||null;
+      const a=game.active;
+      a.triedIds=a.triedIds||[];
+      if(!a.triedIds.includes(p.id))a.triedIds.push(p.id);
+      a.buzzQueue=(a.buzzQueue||[]).filter(id=>id!==p.id);
+      const nextId=a.buzzQueue.shift()||null;
+      const next=game.players.find(x=>x.id===nextId)||null;
+      a.playerId=next?.id||null;
       effect={kind:'wrong',playerId:p.id,name:p.name,delta:-q.points,score:p.score,nextId:next?.id||null,nextName:next?.name||null,at:Date.now()};break;
     }
     case 'skip': {
       if(!game.active||game.active.finished)fail(400,'Нет активного вопроса');
-      const index=game.players.findIndex(p=>p.id===game.active.playerId);
-      const next=game.players.length?game.players[(index+1)%game.players.length]:null;
-      game.active.playerId=next?.id||null;
+      const a=game.active;
+      const old=a.playerId;
+      a.buzzQueue=(a.buzzQueue||[]).filter(id=>id!==old);
+      const next=game.players.find(p=>p.id===a.buzzQueue.shift())||null;
+      a.playerId=next?.id||null;
       effect={kind:'select',playerId:next?.id||null,name:next?.name||'',at:Date.now()};break;
     }
     case 'reveal': {
@@ -223,7 +232,10 @@ function action(body){
     }
     case 'kick':{
       game.players=game.players.filter(p=>p.id!==body.playerId);
-      if(game.active?.playerId===body.playerId)game.active.playerId=game.players[0]?.id||null;
+      if(game.active){
+        game.active.buzzQueue=(game.active.buzzQueue||[]).filter(id=>id!==body.playerId);
+        if(game.active.playerId===body.playerId)game.active.playerId=game.active.buzzQueue.shift()||null;
+      }
       break;
     }
     case 'title':{game.title=txt(body.title,50)||'Своя игра';break;}
@@ -302,6 +314,23 @@ const server=http.createServer(async(req,res)=>{
         }
         pushState({kind:'join',name:p.name,at:Date.now()});
         return respond(res,200,{id:p.id,name:p.name,token:p.joinKey});
+      }
+      if(pathname==='/api/buzz'){
+        if(isHost(req))fail(403,'Ведущий не может нажимать кнопку ответа');
+        const p=game.players.find(p=>p.id===body.playerId && p.joinKey===body.token);
+        if(!p)fail(403,'Сначала войдите в игру как игрок');
+        const a=game.active;
+        if(!a||a.finished||a.reveal)fail(409,'Сейчас нельзя отвечать');
+        a.triedIds=a.triedIds||[];
+        a.buzzQueue=a.buzzQueue||[];
+        if(a.triedIds.includes(p.id))fail(409,'Вы уже отвечали на этот вопрос');
+        if(a.playerId===p.id)return respond(res,200,{ok:true,position:0});
+        if(a.buzzQueue.includes(p.id))return respond(res,200,{ok:true,position:a.buzzQueue.indexOf(p.id)+1});
+        let effect=null;
+        if(!a.playerId){a.playerId=p.id;effect={kind:'select',playerId:p.id,name:p.name,at:Date.now()};}
+        else a.buzzQueue.push(p.id);
+        pushState(effect);
+        return respond(res,200,{ok:true,position:a.playerId===p.id?0:a.buzzQueue.length});
       }
       if(pathname==='/api/action'){
         requireHost(req);

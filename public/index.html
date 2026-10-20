@@ -38,6 +38,7 @@
             <div class="question-divider"></div>
             <div id="questionText" class="question-text"></div>
             <div id="answerText" class="answer-text hidden"></div>
+            <div id="buzzArea" class="buzz-area hidden"><button type="button" id="buzzBtn" class="buzz-btn">⚡ ОТВЕТИТЬ ПЕРВЫМ</button><div id="buzzStatus" class="buzz-status">Нажми раньше остальных, чтобы получить право ответа</div></div>
             <div class="question-foot"><span id="answeringText">ВЫБИРАЕМ ИГРОКА</span><div id="timerPill" class="timer-pill hidden">◷ <span id="timerNum">30</span> сек</div></div><div id="stageClockTrack" class="stage-clock-track hidden"><div id="stageClockFill"></div></div>
           </div>
           <div class="section-line scoreboard-label"><div><span class="section-marker">02</span><span>ТАБЛИЦА ЛИДЕРОВ</span></div><span class="section-hint">LIVE SCOREBOARD</span></div>
@@ -51,6 +52,7 @@
             <div class="panel-label">ТЕКУЩИЙ ВОПРОС <span id="currentState">НЕТ</span></div>
             <div id="currentInfo" class="current-info">Выберите вопрос на игровом поле, чтобы начать.</div>
             <div class="panel-label">КТО ОТВЕЧАЕТ</div><div id="playerPicker" class="player-picker"></div>
+            <div class="shortcut-hint"><kbd>1</kbd> — верно, <kbd>0</kbd> — неверно (работает и с NumPad)</div>
             <div class="decision-row"><button id="correctBtn" class="decision correct" disabled><span class="decision-icon">✓</span><span>Правильно<small id="correctAmount">+300 ОЧКОВ</small></span></button><button id="wrongBtn" class="decision wrong" disabled><span class="decision-icon">✕</span><span>Неправильно<small id="wrongAmount">−300 ОЧКОВ</small></span></button></div>
             <div class="action-grid"><button id="skipBtn" class="action-btn" disabled>→ Следующий</button><button id="revealBtn" class="action-btn" disabled>◉ Показать ответ</button><button id="timerBtn" class="action-btn" disabled>◷ Таймер 30с</button><button id="closeBtn" class="action-btn" disabled>□ Завершить вопрос</button></div>
             <button id="undoBtn" class="undo-btn">↶ Отменить последнее начисление</button>
@@ -87,6 +89,7 @@
   <div id="toastArea" class="toast-area"></div>
   <div id="modalCover" class="modal-cover hidden">
     <div class="modal-card"><button id="closeModal" class="modal-close" aria-label="Закрыть">×</button><div class="modal-sigil">✦</div><div id="modalTitle" class="modal-title">Добро пожаловать</div><div id="modalSubtitle" class="modal-sub">Введи своё имя и присоединяйся к игре.</div>
+      <div id="roleChooser" class="role-chooser"><button type="button" id="choosePlayer" class="role-choice selected" aria-pressed="true">Игрок</button><button type="button" id="chooseHost" class="role-choice" aria-pressed="false">Ведущий</button></div>
       <form id="modalForm"><label id="modalLabel" class="field-label" for="modalInput">ВАШЕ ИМЯ</label><input id="modalInput" autocomplete="off" maxlength="30" required placeholder="Например, Самирбек"/><button id="modalSubmit" class="gold-btn wide" type="submit">Начать игру <span>↗</span></button></form>
       <p id="modalFooter" class="modal-footer">Никакой регистрации — только имя и игра.</p>
     </div>

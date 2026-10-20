@@ -62,6 +62,8 @@ $('menuToggle').onclick=()=>{
   const shown=document.body.classList.toggle('menu-open');$('menuToggle').setAttribute('aria-expanded',String(shown));
 };
 $('closeHostPanel').onclick=()=>document.body.classList.remove('panel-open');
+$('stageCategory').onclick=()=>{if(state?.host&&state?.active)document.body.classList.toggle('panel-open');};
+$('stageCategory').title='Ведущий: нажмите здесь, чтобы открыть пульт';
 document.addEventListener('click',e=>{
   if(document.body.classList.contains('menu-open')&&!e.target.closest('#menuToggle')&&!e.target.closest('.top-actions')){
     document.body.classList.remove('menu-open');$('menuToggle').setAttribute('aria-expanded','false');
@@ -163,9 +165,9 @@ function renderBoard(){
 function renderStage(){
   const stage=$('questionStage'),active=state.active,area=document.querySelector('.play-area');
   const q=active&&state.questions.find(q=>q.id===active.questionId);
-  if(!q){stage.classList.add('hidden');area.classList.remove('in-question');lastQuestionId='';return;}
+  if(!q){stage.classList.add('hidden');area.classList.remove('in-question');document.body.classList.remove('question-open');lastQuestionId='';return;}
   const change=lastQuestionId!==q.id;
-  stage.classList.remove('hidden');area.classList.add('in-question');
+  stage.classList.remove('hidden');area.classList.add('in-question');document.body.classList.add('question-open');
   if(change){stage.style.animation='none';stage.offsetHeight;stage.style.animation='';lastQuestionId=q.id;}
   const cat=state.categories.find(c=>c.id===q.categoryId);
   setText('stageCategory',(cat?.name||'Категория').toUpperCase());

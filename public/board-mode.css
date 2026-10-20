@@ -198,3 +198,119 @@ body.panel-open .host-panel:not(.hidden){transform:translateX(0)}
  .question-text{font-size:clamp(19px,5.5vw,30px)!important;margin:8px 0!important}
  .question-stage-top{font-size:10px}
 }
+
+/* Minimal question display — remove the marked UI, center the actual question. */
+body.question-open #menuToggle,
+body.question-open .top-actions,
+body.question-open .q-top-label,
+body.question-open .q-top-mark,
+body.question-open .question-divider,
+body.question-open .question-foot{display:none!important}
+.question-stage:not(.hidden){
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr);
+  grid-template-rows:minmax(32px,auto) minmax(88px,auto) minmax(0,1fr) auto auto;
+  align-items:center!important;
+  justify-items:center!important;
+  justify-content:center!important;
+  gap:0!important;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:clamp(20px,3vw,50px)!important;
+  text-align:center;
+}
+.question-stage-top{
+  grid-column:1;
+  grid-row:1;
+  align-self:start!important;
+  justify-self:center!important;
+  display:flex!important;
+  justify-content:center!important;
+  width:auto!important;
+  min-height:30px;
+  padding:0!important;
+  color:#c6d7f7!important;
+  font-size:clamp(14px,1.45vw,22px)!important;
+  letter-spacing:2px;
+}
+#stageCategory{
+  cursor:default;
+}
+body.host-mode.question-open #stageCategory{cursor:pointer}
+.question-value{
+  grid-column:1;
+  grid-row:2;
+  justify-self:center!important;
+  align-self:start!important;
+  margin:clamp(15px,3.6vh,34px) 0 0!important;
+  font-size:clamp(58px,6.3vw,102px)!important;
+  line-height:1!important;
+  color:#fff!important;
+  font-weight:900!important;
+  animation:valuePop .6s ease both;
+}
+.question-text{
+  grid-column:1;
+  grid-row:3;
+  align-self:center!important;
+  justify-self:center!important;
+  max-width:min(1380px,98%)!important;
+  width:100%;
+  margin:0 auto!important;
+  padding:0 2px;
+  font:800 clamp(37px,5.1vw,86px)/1.18 Manrope,"Segoe UI",sans-serif!important;
+  letter-spacing:-1.3px!important;
+  text-align:center!important;
+  text-wrap:balance;
+  color:#fff!important;
+  text-shadow:none!important;
+}
+.answer-text:not(.hidden){
+  grid-column:1;
+  grid-row:4;
+  justify-self:center;
+  max-width:950px;
+  width:100%;
+  margin:0 auto 12px!important;
+}
+.buzz-area:not(.hidden){
+  grid-column:1;
+  grid-row:5;
+  justify-self:center;
+  align-self:end!important;
+  margin:0 auto 6px!important;
+  max-width:100%;
+}
+@media(max-width:700px){
+  .question-stage:not(.hidden){
+    padding:clamp(15px,4vw,24px)!important;
+    grid-template-rows:minmax(25px,auto) minmax(80px,auto) minmax(0,1fr) auto auto;
+  }
+  .question-stage-top{font-size:clamp(13px,4vw,18px)!important}
+  .question-value{font-size:clamp(52px,13vw,84px)!important;margin:14px 0 0!important}
+  .question-text{
+    font-size:clamp(24px,7.1vw,39px)!important;
+    line-height:1.24!important;
+    letter-spacing:-.5px!important;
+    max-width:100%!important;
+    margin:0 auto!important;
+  }
+  .buzz-area:not(.hidden){margin:0 auto 2px!important}
+}
+@media(max-height:550px){
+  .question-stage:not(.hidden){grid-template-rows:24px 60px minmax(0,1fr) auto auto;padding:10px 18px!important}
+  .question-value{font-size:clamp(40px,9vh,70px)!important;margin:6px 0 0!important}
+  .question-text{font-size:clamp(24px,5.4vh,45px)!important}
+  .buzz-btn{min-height:50px}
+}
+
+/* Align the headline with the physical center of wide displays. */
+@keyframes centeredQuestionIntro{
+ from{opacity:0;filter:blur(9px);transform:translateY(calc(-9vh + 14px))}
+ to{opacity:1;filter:blur(0);transform:translateY(-9vh)}
+}
+@media(min-width:741px) and (min-height:551px){
+ .question-stage:not(.hidden) .question-text{
+   animation:centeredQuestionIntro .7s ease both!important;
+ }
+}

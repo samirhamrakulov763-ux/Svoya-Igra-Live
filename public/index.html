@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#08111f"/>
   <title>Своя игра — Live Quiz</title>
   <link rel="stylesheet" href="/style.css"/>
+  <link rel="stylesheet" href="/board-mode.css"/>
   <script defer src="/app.js"></script>
 </head>
 <body>
@@ -44,7 +45,7 @@
           <div class="footer-note"><span>✦</span> СОЗДАНО ДЛЯ ЯРКИХ ИГР И БОЛЬШИХ ПОБЕД <span>✦</span></div>
         </main>
         <aside id="hostPanel" class="host-panel hidden">
-          <div class="panel-heading"><div class="panel-icon">♛</div><div><div class="panel-title">Пульт ведущего</div><div class="panel-sub">УПРАВЛЕНИЕ ЭФИРОМ <span class="host-label-mini">• CONTROL ROOM</span></div></div><span class="panel-online"></span></div>
+          <div class="panel-heading"><div class="panel-icon">♛</div><div><div class="panel-title">Пульт ведущего</div><div class="panel-sub">УПРАВЛЕНИЕ ЭФИРОМ <span class="host-label-mini">• CONTROL ROOM</span></div></div><button type="button" id="closeHostPanel" aria-label="Закрыть пульт" title="Закрыть пульт">×</button><span class="panel-online"></span></div>
           <div class="tab-bar"><button class="tab active" data-tab="control">Пульт</button><button class="tab" data-tab="editor">Редактор</button><button class="tab" data-tab="settings">Игра</button></div>
           <div id="tabControl" class="panel-body">
             <div class="panel-label">ТЕКУЩИЙ ВОПРОС <span id="currentState">НЕТ</span></div>
@@ -79,6 +80,7 @@
         </aside>
       </div>
     </div>
+    <button id="menuToggle" type="button" title="Меню: игрок или ведущий" aria-label="Открыть меню" aria-expanded="false">⚙</button>
     <footer class="bottom-bar"><span>✦ СВОЯ ИГРА <small>© LIVE QUIZ</small></span><div><span id="footerStatus">ОЖИДАНИЕ УЧАСТНИКОВ</span><span class="footer-divider"></span>ИГРАЙ. ДУМАЙ. ПОБЕЖДАЙ.</div></footer>
   </div>
   <div id="flashLayer" class="flash-layer" aria-hidden="true"></div>

@@ -241,7 +241,7 @@ async function readBody(req) {
 }
 const staticFiles = {
   '/':'index.html','/index.html':'index.html',
-  '/app.js':'app.js','/style.css':'style.css'
+  '/app.js':'app.js','/style.css':'style.css','/board-mode.css':'board-mode.css'
 };
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'};
 const server=http.createServer(async(req,res)=>{

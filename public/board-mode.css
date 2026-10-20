@@ -1,0 +1,158 @@
+/* TABLE-ONLY DESIGN — exact flat blue/yellow visual from the approved mockup.
+   Existing game/server functions remain in the original JS and styles. */
+:root{
+ --board-bg:#083E98;
+ --board-tile:#297BEA;
+ --board-category:#FFCC24;
+ --board-white:#FFFFFF;
+}
+html,body{margin:0;min-height:100%;width:100%;background:var(--board-bg)!important}
+body{background:var(--board-bg)!important;overflow-x:hidden;color:var(--board-white)}
+body::before,body::after,.ambient,.broadcast-strip,.brand,.brand-copy,.center-status,
+.content-head,.section-line,.under-board,.progress-track,.footer-note,.bottom-bar,
+.board-shell-top,.board-shell-bottom,.scoreboard,.scoreboard-label{display:none!important}
+.app-shell{min-height:100dvh;display:flex;align-items:stretch;justify-content:center;
+  background:var(--board-bg)!important}
+.topbar{display:contents!important;background:none!important;border:0!important}
+.content{padding:0!important;margin:0!important;width:100%!important;max-width:none!important;
+  flex:1;min-height:100dvh;display:grid;place-items:center;background:transparent!important}
+.main-layout,.main-layout.has-host{display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+  width:100%!important;min-width:0;gap:0!important;place-items:center}
+.play-area{width:100%!important;min-width:0;display:grid;place-items:center;position:relative;
+  padding:clamp(14px,4.2vh,50px) clamp(12px,4vw,80px);isolation:isolate}
+.board-shell{padding:0!important;width:min(100%,1600px)!important;max-width:none!important;
+  border:none!important;outline:none!important;border-radius:0!important;
+  background:transparent!important;background-image:none!important;box-shadow:none!important;
+  overflow:visible!important}
+.board-shell::before,.board-shell::after{display:none!important}
+.board{width:100%;display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr))!important;
+  gap:clamp(7px,.7vw,13px)!important;height:min(80dvh,790px);
+  min-height:420px;overflow:visible!important;transform:none!important;
+  opacity:1!important;filter:none!important;padding:0!important}
+.category-col{display:grid;min-width:0;grid-template-rows:repeat(var(--rows),minmax(0,1fr));
+  gap:clamp(7px,.7vw,13px)!important}
+.cat-title,.q-tile{width:100%;min-width:0;min-height:0;height:100%!important;
+  border:0!important;outline-offset:3px;border-radius:clamp(8px,.85vw,14px)!important;
+  background-image:none!important;box-shadow:none!important;text-shadow:none!important;
+  transform:none;transition:background-color .16s ease,transform .16s ease,opacity .16s ease!important}
+.cat-title::before,.cat-title::after,.q-tile::before,.q-tile::after{display:none!important}
+.cat-title{background-color:var(--board-category)!important;color:#092A72!important;
+  display:flex!important;align-items:center;justify-content:center;
+  padding:8px 6px!important;overflow:hidden;
+  font-family:Outfit,Manrope,"Segoe UI",sans-serif!important;
+  font-size:clamp(10px,1.7vw,26px)!important;font-weight:900!important;
+  letter-spacing:-.45px;text-align:center;line-height:1.15}
+.cat-name{overflow-wrap:anywhere;color:inherit!important}
+.cat-index{display:none!important}
+.q-tile{background-color:var(--board-tile)!important;color:var(--board-white)!important;
+  padding:4px!important;display:flex;align-items:center;justify-content:center!important;
+  cursor:default;font-family:Outfit,Manrope,"Segoe UI",sans-serif!important;
+  font-size:clamp(24px,3.15vw,49px)!important;font-weight:900!important;letter-spacing:0!important}
+.q-tile>span{color:inherit!important;line-height:1.1!important;font-weight:900}
+.q-tile small{display:none!important}
+.q-tile:not(.host-tile):hover{background-color:var(--board-tile)!important;transform:none!important}
+.q-tile.host-tile:not(:disabled){cursor:pointer!important}
+.q-tile.host-tile:hover:not(:disabled){background-color:#4D96F6!important;transform:translateY(-2px)!important}
+.q-tile.is-active{background-color:#60A5FA!important;animation:none!important}
+.q-tile.used{background:#1453A5!important;color:transparent!important;opacity:.78!important;cursor:default!important}
+.q-tile.used>span{display:none!important}
+.q-tile.used::before,.q-tile.used::after{display:none!important}
+.board-empty{background:#297bea;border:0;border-radius:12px;color:#fff}
+
+/* The game is the only permanent content. An unobtrusive tools dot gives
+   players/hosts access without permanently adding a visible navigation bar. */
+.top-actions{position:fixed!important;right:18px;bottom:65px;z-index:32;
+  display:none!important;flex-direction:column!important;align-items:stretch!important;
+  gap:7px!important;padding:9px!important;background:#072b75!important;
+  border:1px solid #518aeb!important;border-radius:13px!important;
+  box-shadow:0 8px 28px #05295ba3!important;min-width:165px}
+body.menu-open .top-actions{display:flex!important}
+.identity{display:none!important}
+.top-actions button{width:100%;border-radius:9px!important;padding:11px!important;
+  white-space:nowrap;text-align:center;letter-spacing:0;font-size:12px!important}
+#menuToggle{position:fixed;z-index:32;right:18px;bottom:17px;width:39px;height:39px;
+  border-radius:50%;border:1px solid #377aca;background:#0b4ba7;color:#d5e9ff;
+  display:grid;place-items:center;font-size:22px;cursor:pointer;opacity:.26;
+  transition:opacity .2s ease,background-color .2s ease,transform .2s ease}
+#menuToggle:hover,#menuToggle:focus-visible,body.menu-open #menuToggle,body.panel-open #menuToggle{
+  opacity:1;background:#1462c9;transform:rotate(14deg)}
+#menuToggle:focus-visible{outline:2px solid #ffcd24}
+body:not(.host-mode) .host-panel{display:none!important}
+.host-panel{position:fixed!important;right:16px;top:16px;bottom:16px;
+  width:min(390px,calc(100vw - 32px));max-width:none!important;min-height:0;
+  z-index:34;overflow:auto!important;overscroll-behavior:contain;
+  transform:translateX(calc(100% + 36px));transition:transform .26s ease!important;
+  background:#10223d!important;border:1px solid #426caa!important;
+  box-shadow:0 18px 60px #00276494!important}
+body.panel-open .host-panel:not(.hidden){transform:translateX(0)}
+.panel-heading{position:sticky;top:0;z-index:1;background:#10223d!important}
+#closeHostPanel{margin-left:auto;border:1px solid #5072a4;background:#19385c;color:#fff;
+ border-radius:9px;width:34px;height:34px;font-size:22px;line-height:1;cursor:pointer}
+.panel-online{display:none}
+.panel-label,.current-info,.panel-body{color:#d9e7fa}
+.question-stage{position:fixed!important;inset:0!important;z-index:14;min-height:100dvh!important;
+  width:100vw!important;height:100dvh!important;max-height:none;margin:0!important;
+  padding:clamp(20px,3vw,55px)!important;border:0!important;border-radius:0!important;
+  display:flex!important;background:var(--board-bg)!important;background-image:none!important;
+  box-shadow:none!important}
+.question-stage.hidden{display:none!important}
+.question-stage::before,.question-stage::after,.question-glow,.stage-ornament,.stage-edge{display:none!important}
+.question-stage-top{font-weight:800;font-size:clamp(12px,1.5vw,19px)}
+.q-top-label{background-color:var(--board-category)!important;background-image:none!important;
+  color:#072966!important;border:0!important;font-size:clamp(11px,1.3vw,18px);padding:12px 18px}
+.question-value{color:#fff!important;text-shadow:none!important;font-size:clamp(60px,11vw,145px)!important;
+  font-weight:900;letter-spacing:0!important;margin:4vh auto 0!important}
+.question-value small{display:none!important}
+.question-divider{height:4px;background:var(--board-category)!important;width:90px;
+  box-shadow:none!important}
+.question-text{color:#fff;font-size:clamp(24px,4.5vw,62px)!important;line-height:1.28;
+  font-weight:800;max-width:1200px!important;text-shadow:none!important;letter-spacing:-1px}
+.question-foot{width:auto!important;max-width:100%;background:#0A52AF!important;border:none!important;
+  border-radius:12px!important;padding:16px 22px!important;color:#fff!important;
+  font-size:clamp(11px,1.4vw,17px)}
+.answer-text{max-width:900px;border:0!important;background:#077D65!important;color:#fff!important}
+.stage-clock-track{background:#105abd!important;box-shadow:none!important}
+.stage-clock-track>div{background:#ffcc24!important;box-shadow:none!important}
+.modal-cover{z-index:42}
+.modal-card{border-radius:20px!important;background:#093d95!important;border:2px solid #ffcc24!important;box-shadow:0 20px 70px #002462!important}
+.modal-card::after{display:none!important}
+.modal-sigil{background:var(--board-category)!important;box-shadow:none!important;border:0!important;color:#092c77!important}
+.modal-title,.modal-sub{color:#fff}
+.modal-card .field-label{color:#d4e8ff}
+.modal-card input{background:#155bbc!important;color:#fff!important;border:1px solid #76aaf0!important}
+.modal-card input::placeholder{color:#aacdf7!important}
+.modal-card .gold-btn{background:#ffcc24!important;color:#092a70!important;border:0!important;box-shadow:none!important}
+.flash-layer{z-index:22}
+.effect-content{background:#083e98ee!important;border:3px solid #ffcc24!important;border-radius:18px;
+  box-shadow:none!important}
+.effect-title{color:#fff}
+.toast-area{z-index:44}
+
+/* Reference-like spacing at landscape TV/projector dimensions */
+@media(min-width:1280px) and (max-height:850px){
+  .board{height:min(86dvh,750px);min-height:0}
+}
+@media(max-width:740px){
+  .play-area{padding:14px 9px}
+  .board-shell{width:100%!important}
+  .board{height:min(78dvh,660px);min-height:365px;gap:6px!important}
+  .category-col{gap:6px!important}
+  .cat-title{padding:6px 2px!important;font-size:clamp(10px,2.6vw,16px)!important;
+    letter-spacing:-.3px;border-radius:8px!important}
+  .q-tile{font-size:clamp(17px,5.6vw,31px)!important;border-radius:8px!important}
+  .question-value{margin-top:12vh!important}
+  .question-text{font-size:clamp(22px,6vw,33px)!important}
+}
+@media(max-width:390px){
+  .board{gap:4px!important;min-height:330px}
+  .category-col{gap:4px!important}
+  .cat-title{font-size:10px!important;letter-spacing:-.45px;border-radius:6px!important}
+  .q-tile{border-radius:6px!important;font-size:20px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .host-panel,#menuToggle,.q-tile{transition:none!important}
+}
+
+/* Guest tiles must stay bright even though only the host may click them. */
+.q-tile:disabled:not(.used){opacity:1!important;filter:none!important}
+.q-tile.used{opacity:.72!important;filter:none!important}

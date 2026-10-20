@@ -43,25 +43,46 @@ function openModal(mode){
   $('modalInput').inputMode=host?'numeric':'text';
   $('modalInput').maxLength=host?20:24;
   $('modalInput').value='';
-  $('modalInput').placeholder=host?'Шестизначный PIN':'Например, Самирбек';
+  $('modalInput').placeholder=host?'Введите PIN ведущего':'Например, Самирбек';
   $('modalInput').autocomplete=host?'off':'nickname';
   $('modalSubmit').innerHTML=host?'Открыть пульт <span>↗</span>':'Присоединиться <span>↗</span>';
   setText('modalFooter',host?'PIN хранится только на компьютере ведущего.':'Без пароля, аккаунта и постоянной регистрации.');
   setTimeout(()=>$('modalInput').focus(),70);
 }
 function closeModal(){modalDismissed=true;$('modalCover').classList.add('hidden');}
-$('openHost').onclick=()=>state?.host?document.getElementById('hostPanel').scrollIntoView({behavior:'smooth'}):openModal('host');
-$('openJoin').onclick=()=>openModal('join');
+$('openHost').onclick=()=>{
+  document.body.classList.remove('menu-open');$('menuToggle').setAttribute('aria-expanded','false');
+  if(state?.host)document.body.classList.toggle('panel-open');else openModal('host');
+};
+$('menuToggle').onclick=()=>{
+  const shown=document.body.classList.toggle('menu-open');$('menuToggle').setAttribute('aria-expanded',String(shown));
+};
+$('closeHostPanel').onclick=()=>document.body.classList.remove('panel-open');
+document.addEventListener('click',e=>{
+  if(document.body.classList.contains('menu-open')&&!e.target.closest('#menuToggle')&&!e.target.closest('.top-actions')){
+    document.body.classList.remove('menu-open');$('menuToggle').setAttribute('aria-expanded','false');
+  }
+});
+$('openJoin').onclick=()=>{document.body.classList.remove('menu-open');openModal('join');};
 $('closeModal').onclick=closeModal;
 $('modalCover').addEventListener('click',e=>{if(e.target===$('modalCover'))closeModal();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('modalCover').classList.contains('hidden'))closeModal();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(!$('modalCover').classList.contains('hidden'))closeModal();
+    else if(document.body.classList.contains('panel-open'))document.body.classList.remove('panel-open');
+    else document.body.classList.remove('menu-open');
+  }
+  if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==='h'){
+    e.preventDefault();if(state?.host)document.body.classList.toggle('panel-open');else openModal('host');
+  }
+});
 $('modalForm').addEventListener('submit',async e=>{
   e.preventDefault();const value=$('modalInput').value.trim();if(!value)return;
   $('modalSubmit').disabled=true;
   try{
     if(modalMode==='host'){
       await request('/api/login',{pin:value});toast('Режим ведущего активирован');closeModal();
-      await reloadState();connect();
+      await reloadState();document.body.classList.add('panel-open');connect();
     }else{
       const result=await request('/api/join',{name:value,id:myId,token:myToken});
       myId=result.id;myToken=result.token;
@@ -93,7 +114,9 @@ function render(next){
   $('progressFill').style.width=(state.questions.length?((state.questions.length-pending)/state.questions.length)*100:0)+'%';
   setText('footerStatus',state.active?'ВОПРОС В ЭФИРЕ':'ОЖИДАНИЕ ВОПРОСА');
   renderBoard();renderStage();renderScoreboard(prev);if(host){renderControl();renderEditorOptions();renderSettings();}
-  if(!host&&!myId&&!modalDismissed&&!sessionStorage.getItem('svo_spectate')){openModal('join');modalDismissed=true;}
+  document.body.classList.toggle('host-mode',host);
+  if(!host)document.body.classList.remove('panel-open');
+  if(!host&&!currentMe&&!modalDismissed&&!sessionStorage.getItem('svo_spectate')){openModal('join');modalDismissed=true;}
   isFirstRender=false;
 }
 function renderBoard(){
@@ -102,17 +125,18 @@ function renderBoard(){
   if(!state.categories.length){board.append(dom('div','board-empty','Ведущий пока не добавил категории.'));return;}
   const points=new Set([100,200,300,400,500,...state.questions.map(q=>q.points)]);
   const values=[...points].sort((a,b)=>a-b);
+  board.style.setProperty('--rows',values.length+1);
   for(const c of state.categories){
     const col=dom('div','category-col');
     const categoryHead=dom('div','cat-title');
-    categoryHead.append(dom('span','cat-index',String(state.categories.indexOf(c)+1).padStart(2,'0')),dom('span','cat-name',c.name));
+    categoryHead.append(dom('span','cat-name',c.name));
     col.append(categoryHead);
     for(const pts of values){
       const q=state.questions.find(q=>q.categoryId===c.id&&q.points===pts);
       const tile=dom('button','q-tile'+(state.host?' host-tile':'')+(!q||q.used?' used':'')+(state.active?.questionId===q?.id?' is-active':''));
       tile.type='button';tile.disabled=!state.host||!q||q.used||!!state.active;
       tile.title=q?(state.host?q.text:'Вопрос '+pts+' очков'):'Вопрос не добавлен';
-      if(q){tile.append(dom('span','',fmt(pts)));tile.append(dom('small','','ОЧКОВ'));}
+      if(q){tile.append(dom('span','',fmt(pts)));}
       if(state.host&&q&&!q.used)tile.onclick=()=>send({type:'open',questionId:q.id});
       col.append(tile);
     }
@@ -129,7 +153,7 @@ function renderStage(){
   if(change){stage.style.animation='none';stage.offsetHeight;stage.style.animation='';lastQuestionId=q.id;}
   const cat=state.categories.find(c=>c.id===q.categoryId);
   setText('stageCategory',(cat?.name||'Категория').toUpperCase());
-  $('questionValue').replaceChildren(document.createTextNode(fmt(q.points)+' '),dom('small','','ОЧКОВ'));
+  $('questionValue').textContent=fmt(q.points);
   setText('questionText',q.text||'');
   const answer=$('answerText');
   const show=!!(active.reveal||state.host);
@@ -272,7 +296,7 @@ $('saveTitle').onclick=()=>send({type:'title',title:$('titleInput').value});
 $('nextRound').onclick=()=>{if(confirm('Начать новый раунд? Все вопросы снова станут доступными, баллы сохранятся.'))send({type:'nextRound'});};
 $('resetGame').onclick=()=>{if(confirm('Сбросить ВСЕ баллы и прогресс игры? Игроки и вопросы останутся.'))send({type:'reset'});};
 $('copyAddress').onclick=async()=>{try{await navigator.clipboard.writeText(location.origin);toast('Ссылка скопирована');}catch{toast('Ссылка: '+location.origin);}};
-$('logoutBtn').onclick=async()=>{await request('/api/logout',{});toast('Вы вышли из режима ведущего');await reloadState();connect();};
+$('logoutBtn').onclick=async()=>{await request('/api/logout',{});document.body.classList.remove('panel-open');toast('Вы вышли из режима ведущего');await reloadState();connect();};
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   activeTab=b.dataset.tab;document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===activeTab));
   ['Control','Editor','Settings'].forEach(n=>document.getElementById('tab'+n).classList.toggle('hidden',n.toLowerCase()!==activeTab));

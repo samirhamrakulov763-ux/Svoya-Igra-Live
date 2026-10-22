@@ -757,3 +757,30 @@ body.question-open.result-preview .simple-result{
   .player-wager-form:not(.hidden){gap:17px}
   .player-wager-actions{gap:8px}
 }
+
+
+/* Always-accessible role switch on the player's fullscreen buzzer. */
+.player-switch-role{
+  position:fixed;
+  top:max(12px,env(safe-area-inset-top));
+  right:max(12px,env(safe-area-inset-right));
+  z-index:34;
+  padding:11px 16px;
+  border:1px solid #7aa7ec;
+  border-radius:10px;
+  background:#1555ac;
+  color:#fff;
+  font:700 14px/1.2 Manrope,"Segoe UI",sans-serif;
+  cursor:pointer;
+  box-shadow:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.player-switch-role:hover,.player-switch-role:focus-visible{
+  background:#256ccb;
+  outline:2px solid #ffcf32;
+  outline-offset:2px;
+}
+.player-switch-role:active{background:#0c3987}
+@media(max-width:460px){
+  .player-switch-role{padding:10px 12px;font-size:13px}
+}

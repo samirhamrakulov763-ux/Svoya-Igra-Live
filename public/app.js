@@ -81,6 +81,7 @@ document.addEventListener('click',e=>{
 $('openJoin').onclick=()=>{document.body.classList.remove('menu-open');openModal('join');};
 $('choosePlayer').onclick=()=>openModal('join');
 $('chooseHost').onclick=()=>openModal('host');
+$('playerSwitchRole').onclick=()=>openModal('host');
 $('closeModal').onclick=closeModal;
 $('modalCover').addEventListener('click',e=>{if(e.target===$('modalCover'))closeModal();});
 document.addEventListener('keydown',e=>{

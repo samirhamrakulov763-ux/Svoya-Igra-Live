@@ -55,7 +55,7 @@
             <div id="currentInfo" class="current-info">Выберите вопрос на игровом поле, чтобы начать.</div>
             <div class="panel-label">КТО ОТВЕЧАЕТ</div><div id="playerPicker" class="player-picker"></div>
             <div class="shortcut-hint"><kbd>3</kbd> Пульт · <kbd>1</kbd> Верно · <kbd>0</kbd> Неверно <div class="key-help">→ ответ / поле · ← назад · ↑ скрыть · ↓ вернуть</div></div>
-            <div id="wagerPanel" class="wager-panel hidden"><div id="wagerNotice" class="wager-notice">Сюрприз: ждём первого игрока</div><div class="wager-input-row"><input id="wagerAmount" type="number" min="0" step="1" inputmode="numeric" placeholder="Ставка"/><button id="wagerMax" type="button" class="action-btn">Всё</button><button id="wagerApply" type="button" class="gold-btn">Поставить</button></div></div>
+            <div id="wagerPanel" class="wager-panel hidden"><div id="wagerNotice" class="wager-notice">Сюрприз: ждём первого игрока</div></div>
             <div class="decision-row"><button id="correctBtn" class="decision correct" disabled><span class="decision-icon">✓</span><span>Правильно<small id="correctAmount">+300 ОЧКОВ</small></span></button><button id="wrongBtn" class="decision wrong" disabled><span class="decision-icon">✕</span><span>Неправильно<small id="wrongAmount">−300 ОЧКОВ</small></span></button></div>
             <div class="action-grid"><button id="skipBtn" class="action-btn" disabled>→ Следующий</button><button id="revealBtn" class="action-btn" disabled>◉ Показать ответ</button><button id="timerBtn" class="action-btn" disabled>◷ Таймер 30с</button><button id="closeBtn" class="action-btn" disabled>□ Завершить вопрос</button></div>
             <button id="undoBtn" class="undo-btn">↶ Отменить последнее начисление</button>
@@ -89,7 +89,7 @@
     <button id="menuToggle" type="button" title="Меню: игрок или ведущий" aria-label="Открыть меню" aria-expanded="false">⚙</button>
     <footer class="bottom-bar"><span>✦ СВОЯ ИГРА <small>© LIVE QUIZ</small></span><div><span id="footerStatus">ОЖИДАНИЕ УЧАСТНИКОВ</span><span class="footer-divider"></span>ИГРАЙ. ДУМАЙ. ПОБЕЖДАЙ.</div></footer>
   </div>
-  <div id="playerConsole" class="player-console hidden"><button id="redBuzzer" class="red-buzzer" type="button" aria-label="Нажать для ответа"></button></div>
+  <div id="playerConsole" class="player-console hidden"><button id="redBuzzer" class="red-buzzer" type="button" aria-label="Нажать для ответа"></button><form id="playerWagerForm" class="player-wager-form hidden"><div class="player-wager-label">СЮРПРИЗ</div><div id="playerWagerHint" class="player-wager-hint">Выберите свою ставку</div><input id="playerWagerAmount" type="number" min="0" step="1" inputmode="numeric" required aria-label="Сумма ставки"/><div class="player-wager-actions"><button id="playerWagerAll" type="button">ВСЁ</button><button id="playerWagerSubmit" type="submit">ПОСТАВИТЬ</button></div><div id="playerWagerError" class="player-wager-error" aria-live="polite"></div></form><div id="playerWagerConfirmed" class="player-wager-confirmed hidden" aria-live="polite"></div></div>
   <div id="blankLayer" class="blank-layer hidden" aria-hidden="true"></div>
   <div id="flashLayer" class="flash-layer" aria-hidden="true"></div>
   <div id="toastArea" class="toast-area"></div>

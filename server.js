@@ -143,7 +143,7 @@ function action(body){
       if(!game.active.playerId)fail(400,'Сначала выберите игрока');
       const p=player(game.active.playerId),q=question(game.active.questionId);
       const delta=game.active.surprise?game.active.wager:q.points;
-      if(!Number.isInteger(delta)||delta<0)fail(409,'Сначала установите ставку для сюрприза');
+      if(!Number.isInteger(delta)||delta<0)fail(409,'Дождитесь ставки игрока с телефона');
       p.score+=delta;q.used=true;game.active.finished=true;game.active.timerEnd=null;
       effect={kind:'correct',playerId:p.id,name:p.name,delta,score:p.score,at:Date.now()};break;
     }
@@ -152,7 +152,7 @@ function action(body){
       if(!game.active.playerId)fail(400,'Сначала выберите игрока');
       const p=player(game.active.playerId),q=question(game.active.questionId);
       const delta=game.active.surprise?game.active.wager:q.points;
-      if(!Number.isInteger(delta)||delta<0)fail(409,'Сначала установите ставку для сюрприза');
+      if(!Number.isInteger(delta)||delta<0)fail(409,'Дождитесь ставки игрока с телефона');
       p.score-=delta;
       const a=game.active;
       if(a.surprise){
@@ -222,17 +222,6 @@ function action(body){
       const id=body.questionId||null;
       if(id){const q=question(id);if(q.used)fail(409,'Вопрос уже сыгран');}
       game.surpriseQuestionId=id;
-      break;
-    }
-    case 'setWager': {
-      const a=game.active;
-      if(!a||!a.surprise||a.finished||a.reveal||!a.playerId)
-        fail(409,'Сейчас нельзя сделать ставку');
-      if(a.wager!==null)fail(409,'Ставка уже зафиксирована');
-      const p=player(a.playerId),stake=Number(body.amount),available=Math.max(0,p.score);
-      if(!Number.isSafeInteger(stake)||stake<0||stake>available)
-        fail(400,'Ставка должна быть от 0 до '+available+' баллов');
-      a.wager=stake;
       break;
     }
     case 'reveal': {
@@ -414,6 +403,21 @@ const server=http.createServer(async(req,res)=>{
         else a.buzzQueue.push(p.id);
         pushState(effect);
         return respond(res,200,{ok:true,position:a.playerId===p.id?0:a.buzzQueue.length});
+      }
+      if(pathname==='/api/wager'){
+        if(isHost(req))fail(403,'Ставку вводит игрок с телефона, а не ведущий');
+        const p=game.players.find(p=>p.id===body.playerId && p.joinKey===body.token);
+        if(!p)fail(403,'Нужно войти под своим именем');
+        const a=game.active;
+        if(!a||!a.surprise||a.finished||a.reveal||game.blank||a.playerId!==p.id)
+          fail(409,'Сейчас вы не можете поставить баллы');
+        if(a.wager!==null)fail(409,'Ставка уже подтверждена');
+        const max=Math.max(0,p.score);
+        if(typeof body.amount!=='number'||!Number.isSafeInteger(body.amount)||body.amount<0||body.amount>max)
+          fail(400,'Ставка должна быть от 0 до '+max+' баллов');
+        a.wager=body.amount;
+        pushState({kind:'wager',playerId:p.id,name:p.name,amount:a.wager,at:Date.now()});
+        return respond(res,200,{ok:true,amount:a.wager});
       }
       if(pathname==='/api/action'){
         requireHost(req);

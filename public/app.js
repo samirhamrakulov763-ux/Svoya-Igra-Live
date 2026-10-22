@@ -273,7 +273,67 @@ function renderRedBuzzer(){
   button.classList.toggle('red-buzzer-active',!!a&&a.playerId===myId);
   button.classList.toggle('red-buzzer-queued',!!a&&(a.buzzQueue||[]).includes(myId));
   button.setAttribute('aria-label',!a?'Красная кнопка — ожидание вопроса':a.playerId===myId?'Вы отвечаете':canBuzz?'Нажать для ответа':'Нажатие зарегистрировано');
+  renderPlayerWager();
 }
+
+let wagerInputKey='',wagerSubmitting=false;
+function renderPlayerWager(){
+  const a=state?.active,me=state?.players.find(p=>p.id===myId);
+  const mine=!!me&&!state.host&&a?.surprise&&a.playerId===myId&&!a.reveal&&!state.blank;
+  const form=$('playerWagerForm'),confirmed=$('playerWagerConfirmed'),button=$('redBuzzer');
+  const choosing=!!mine&&!a.finished&&a.wager===null;
+  const accepted=!!mine&&a.wager!==null;
+  form.classList.toggle('hidden',!choosing);
+  confirmed.classList.toggle('hidden',!accepted);
+  button.classList.toggle('hidden',choosing||accepted);
+  if(!choosing&&!accepted){wagerInputKey='';return;}
+  if(choosing){
+    const max=Math.max(0,me.score),input=$('playerWagerAmount');
+    const key=a.questionId+':'+myId;
+    if(key!==wagerInputKey){
+      wagerInputKey=key;
+      input.value=String(max);
+      setText('playerWagerError','');
+    }
+    input.max=String(max);
+    setText('playerWagerHint','У тебя '+fmt(max)+' баллов. Сколько ставишь?');
+    $('playerWagerSubmit').disabled=wagerSubmitting;
+    $('playerWagerAll').disabled=wagerSubmitting;
+  }
+  if(accepted){
+    wagerInputKey='';
+    setText('playerWagerConfirmed','СТАВКА '+fmt(a.wager)+' ПРИНЯТА');
+  }
+}
+$('playerWagerAll').onclick=()=>{
+  const p=state?.players.find(p=>p.id===myId);
+  if(p)$('playerWagerAmount').value=String(Math.max(0,p.score));
+};
+$('playerWagerForm').onsubmit=async e=>{
+  e.preventDefault();
+  if(wagerSubmitting)return;
+  const a=state?.active,me=state?.players.find(p=>p.id===myId);
+  if(!a?.surprise||a.playerId!==myId||a.wager!==null||!me)return;
+  const raw=$('playerWagerAmount').value.trim();
+  const max=Math.max(0,me.score);
+  if(!/^\d+$/.test(raw)||!Number.isSafeInteger(Number(raw))||Number(raw)>max){
+    setText('playerWagerError','Введи целое число от 0 до '+fmt(max));
+    return;
+  }
+  wagerSubmitting=true;
+  setText('playerWagerError','');
+  renderPlayerWager();
+  try{
+    await request('/api/wager',{playerId:myId,token:myToken,amount:Number(raw)});
+    await reloadState();
+  }catch(err){
+    setText('playerWagerError',err.message);
+  }finally{
+    wagerSubmitting=false;
+    renderPlayerWager();
+  }
+};
+
 $('redBuzzer').onclick=async()=>{
   if(redBusy||!myId||!myToken||state?.host)return;
   redBusy=true;renderRedBuzzer();
@@ -325,7 +385,7 @@ function handleEffect(e){
 }
 function scoreWithFeedback(kind){
   if(keyBusy)return Promise.resolve(false);
-  if(state?.active?.surprise && state.active.wager===null){toast('Сначала зафиксируйте ставку сюрприза',true);return Promise.resolve(false);}
+  if(state?.active?.surprise && state.active.wager===null){toast('Дождитесь ставки игрока с телефона',true);return Promise.resolve(false);}
   keyBusy=true;
   pendingResult={kind,at:Date.now()};
   showResult(kind);
@@ -334,45 +394,16 @@ function scoreWithFeedback(kind){
     return ok;
   }).finally(()=>{keyBusy=false;});
 }
-let lastWagerPlayer='';
 function renderWagerPanel(){
-  const a=state?.active,p=a&&state.players.find(p=>p.id===a.playerId);
-  const box=$('wagerPanel'),notice=$('wagerNotice'),amount=$('wagerAmount');
-  box.classList.toggle('hidden',!a?.surprise);
-  if(!a?.surprise){lastWagerPlayer='';return;}
-  if(!p){
-    notice.textContent='СЮРПРИЗ • ждём первого нажавшего';
-    amount.disabled=true;
-    $('wagerMax').disabled=true;
-    $('wagerApply').disabled=true;
-    return;
-  }
-  const max=Math.max(0,p.score);
-  if(a.playerId!==lastWagerPlayer){
-    lastWagerPlayer=a.playerId;
-    amount.value=String(max);
-  }
-  amount.max=String(max);
-  const fixed=a.wager!==null;
-  notice.textContent=fixed
-    ? p.name+' • ставка '+fmt(a.wager)+' из '+fmt(max)+' очков'
-    : p.name+' • можно поставить от 0 до '+fmt(max)+' очков';
-  amount.disabled=fixed||!!a.finished||!!a.reveal;
-  $('wagerMax').disabled=amount.disabled;
-  $('wagerApply').disabled=amount.disabled;
+  const a=state?.active, p=a&&state.players.find(p=>p.id===a.playerId);
+  $('wagerPanel').classList.toggle('hidden',!a?.surprise);
+  if(!a?.surprise)return;
+  setText('wagerNotice',!p
+    ? 'СЮРПРИЗ • ждём первого нажавшего'
+    : a.wager===null
+      ? p.name+' выбирает ставку на телефоне…'
+      : p.name+' поставил '+fmt(a.wager)+' баллов');
 }
-$('wagerMax').onclick=()=>{
-  const p=state?.players.find(p=>p.id===state.active?.playerId);
-  if(p)$('wagerAmount').value=String(Math.max(0,p.score));
-};
-$('wagerApply').onclick=async()=>{
-  const raw=$('wagerAmount').value,amount=Number(raw);
-  if(raw.trim()===''||!Number.isSafeInteger(amount)||amount<0)
-    return toast('Введите целое число от 0 до накопленных баллов',true);
-  $('wagerApply').disabled=true;
-  try{await request('/api/action',{type:'setWager',amount});}
-  catch(e){toast(e.message,true);$('wagerApply').disabled=false;}
-};
 function renderSurpriseSettings(){
   const picker=$('surprisePicker'),save=$('surpriseSave'),status=$('surpriseStatus');
   const allowed=state.round===1&&!state.active&&!state.recent&&!state.surprisePlayed&&!state.questions.some(q=>q.used);
@@ -390,7 +421,7 @@ function renderSurpriseSettings(){
     : 'Чтобы выбрать сюрприз, сначала начните новую игру.';
   else status.textContent=state.surpriseQuestionId
     ? 'Секретный вопрос выбран. Игрокам он не виден.'
-    : 'Выберите один вопрос до начала игры. Ставку установите после первого нажатия.';
+    : 'Выберите один вопрос до начала игры. Первый игрок поставит баллы с телефона.';
 }
 $('surprisePicker').onchange=()=>{$('surprisePicker').dataset.dirty='1';};
 $('surpriseSave').onclick=async()=>{

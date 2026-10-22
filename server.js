@@ -47,7 +47,7 @@ function makeDefault() {
   seeds.forEach(([,rows],i)=>rows.forEach(([text,answer],j)=>questions.push({
     id:uuid(),categoryId:categories[i].id,points:(j+1)*100,text,answer,used:false
   })));
-  return {title:'Своя игра',round:1,categories,questions,players:[],active:null,revision:0,updatedAt:Date.now()};
+  return {title:'Своя игра',round:1,categories,questions,players:[],active:null,recent:null,blank:false,revision:0,updatedAt:Date.now()};
 }
 let config;
 if(process.env.HOST_PIN){
@@ -81,7 +81,7 @@ function publicState(host=false) {
       ...(host||game.active?.questionId===q.id ? {text:q.text} : {}),
       ...(host||game.active?.reveal&&game.active?.questionId===q.id? {answer:q.answer}: {})
     })),
-    players:game.players.map(({joinKey,...p})=>p),active:game.active,revision:game.revision,
+    players:game.players.map(({joinKey,...p})=>p),active:game.active,blank:!!game.blank,recent:game.recent||null,revision:game.revision,
     updatedAt:game.updatedAt,host
   };
 }
@@ -115,7 +115,7 @@ function action(body){
     case 'open': {
       const q=question(body.questionId);
       if(q.used)fail(400,'Этот вопрос уже сыгран');
-      const playerId=game.players.some(p=>p.id===body.playerId)?body.playerId:(game.players[0]?.id||null);
+      game.recent=null;
       game.active={questionId:q.id,playerId:game.players.some(p=>p.id===body.playerId)?body.playerId:null,buzzQueue:[],triedIds:[],reveal:false,finished:false,openedAt:Date.now(),timerEnd:null};
       effect={kind:'open',questionId:q.id,points:q.points,at:Date.now()};
       break;
@@ -158,6 +158,44 @@ function action(body){
       a.playerId=next?.id||null;
       effect={kind:'select',playerId:next?.id||null,name:next?.name||'',at:Date.now()};break;
     }
+    case 'navigateRight': {
+      if(!game.active)return null;
+      if(!game.active.reveal){
+        game.active.reveal=true;
+        game.active.timerEnd=null;
+        effect={kind:'reveal',at:Date.now()};
+      }else{
+        const a=game.active;
+        question(a.questionId).used=true;
+        game.recent={questionId:a.questionId};
+        game.active=null;
+        effect={kind:'close',at:Date.now()};
+      }
+      break;
+    }
+    case 'navigateLeft': {
+      if(game.active){
+        if(game.active.reveal){
+          game.active.reveal=false;
+          effect={kind:'hideAnswer',at:Date.now()};
+        }else{
+          const a=game.active;
+          question(a.questionId).used=true;
+          game.recent={questionId:a.questionId};
+          game.active=null;
+          effect={kind:'close',at:Date.now()};
+        }
+      }else if(game.recent && game.questions.some(q=>q.id===game.recent.questionId)){
+        game.active={questionId:game.recent.questionId,playerId:null,buzzQueue:[],triedIds:[],reveal:true,finished:true,openedAt:Date.now(),timerEnd:null};
+        effect={kind:'reveal',at:Date.now()};
+      }
+      break;
+    }
+    case 'blank': {
+      game.blank=!!body.enabled;
+      effect={kind:'blank',enabled:game.blank,at:Date.now()};
+      break;
+    }
     case 'reveal': {
       if(!game.active)fail(400,'Нет активного вопроса');
       game.active.reveal=!game.active.reveal;
@@ -166,6 +204,7 @@ function action(body){
     case 'close': {
       if(!game.active)fail(400,'Нет активного вопроса');
       question(game.active.questionId).used=true;
+      game.recent={questionId:game.active.questionId};
       game.active=null;effect={kind:'close',at:Date.now()};break;
     }
     case 'timer': {
@@ -222,11 +261,11 @@ function action(body){
     case 'reset':{
       game.questions.forEach(q=>q.used=false);
       game.players.forEach(p=>p.score=0);
-      game.active=null;game.round=1;game.history=[];
+      game.active=null;game.recent=null;game.blank=false;game.round=1;game.history=[];
       effect={kind:'reset',at:Date.now()};break;
     }
     case 'nextRound':{
-      game.round++;game.active=null;
+      game.round++;game.active=null;game.recent=null;game.blank=false;
       game.questions.forEach(q=>q.used=false);
       effect={kind:'round',round:game.round,at:Date.now()};break;
     }
@@ -320,7 +359,7 @@ const server=http.createServer(async(req,res)=>{
         const p=game.players.find(p=>p.id===body.playerId && p.joinKey===body.token);
         if(!p)fail(403,'Сначала войдите в игру как игрок');
         const a=game.active;
-        if(!a||a.finished||a.reveal)fail(409,'Сейчас нельзя отвечать');
+        if(!a||a.finished||a.reveal||game.blank)fail(409,'Сейчас нельзя отвечать');
         a.triedIds=a.triedIds||[];
         a.buzzQueue=a.buzzQueue||[];
         if(a.triedIds.includes(p.id))fail(409,'Вы уже отвечали на этот вопрос');

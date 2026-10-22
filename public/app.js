@@ -5,7 +5,7 @@ const fmt=n=>new Intl.NumberFormat('ru-RU').format(n);
 let state=null,ev=null,modalMode='join',activeTab='control',editorQuestionId='',editingCategoryId='',lastQuestionId='',lastEffect=null;
 let myId=localStorage.getItem('svo_player_id')||'';
 let myToken=localStorage.getItem('svo_player_token')||'';
-let lastScores=new Map(),isFirstRender=true,modalDismissed=false,lastDecisionKeyAt=0;
+let lastScores=new Map(),isFirstRender=true,modalDismissed=false,lastDecisionKeyAt=0,keyBusy=false,redBusy=false;
 const setText=(id,value)=>{$(id).textContent=String(value);};
 const all=['100','200','300','400','500'];
 function toast(message,error=false){
@@ -82,12 +82,23 @@ document.addEventListener('keydown',e=>{
   }
   if(state?.host&&!e.repeat&&!e.ctrlKey&&!e.altKey&&!e.metaKey &&
      $('modalCover').classList.contains('hidden') &&
-     !e.target.closest('input,textarea,select,[contenteditable="true"]') &&
-     state.active&&!state.active.finished&&state.active.playerId){
-    const key=(e.key==='1'||e.code==='Numpad1')?'correct':(e.key==='0'||e.code==='Numpad0')?'wrong':null;
-    if(key){
+     !e.target.closest('input,textarea,select,[contenteditable="true"]')){
+    if(e.key==='3'||e.code==='Numpad3'){
+      e.preventDefault();document.body.classList.toggle('panel-open');return;
+    }
+    let action=null;
+    if(e.key==='ArrowRight')action={type:'navigateRight'};
+    else if(e.key==='ArrowLeft')action={type:'navigateLeft'};
+    else if(e.key==='ArrowUp')action={type:'blank',enabled:true};
+    else if(e.key==='ArrowDown')action={type:'blank',enabled:false};
+    else if((e.key==='1'||e.code==='Numpad1')&&state.active&&!state.active.finished&&state.active.playerId&&!state.blank)action={type:'correct'};
+    else if((e.key==='0'||e.code==='Numpad0')&&state.active&&!state.active.finished&&state.active.playerId&&!state.blank)action={type:'wrong'};
+    if(action){
       e.preventDefault();
-      if(Date.now()-lastDecisionKeyAt>650){lastDecisionKeyAt=Date.now();send({type:key});}
+      if(!keyBusy&&Date.now()-lastDecisionKeyAt>240){
+        keyBusy=true;lastDecisionKeyAt=Date.now();
+        send(action).finally(()=>{keyBusy=false;});
+      }
     }
   }
   if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==='h'){
@@ -105,7 +116,7 @@ $('modalForm').addEventListener('submit',async e=>{
       const result=await request('/api/join',{name:value,id:myId,token:myToken});
       myId=result.id;myToken=result.token;
       localStorage.setItem('svo_player_id',myId);localStorage.setItem('svo_player_token',myToken);
-      toast('Добро пожаловать, '+result.name+'!');closeModal();
+      closeModal();await reloadState();
     }
   }catch(err){toast(err.message,true);}finally{$('modalSubmit').disabled=false;}
 });
@@ -131,8 +142,16 @@ function render(next){
   setText('usedStat',fmt(state.questions.length-pending)+' / '+fmt(state.questions.length)+' СЫГРАНО');
   $('progressFill').style.width=(state.questions.length?((state.questions.length-pending)/state.questions.length)*100:0)+'%';
   setText('footerStatus',state.active?'ВОПРОС В ЭФИРЕ':'ОЖИДАНИЕ ВОПРОСА');
-  renderBoard();renderStage();renderScoreboard(prev);if(host){renderControl();renderEditorOptions();renderSettings();}
+  const playerOnly=!host&&!!currentMe&&!!myToken;
   document.body.classList.toggle('host-mode',host);
+  document.body.classList.toggle('player-only',playerOnly);
+  document.body.classList.toggle('blank-screen',!!state.blank);
+  $('blankLayer').classList.toggle('hidden',!state.blank);
+  $('playerConsole').classList.toggle('hidden',!playerOnly);
+  $('hostRoster').classList.toggle('hidden',!host);
+  renderBoard();renderStage();renderScoreboard(prev);
+  renderHostRoster();renderRedBuzzer();
+  if(host){renderControl();renderEditorOptions();renderSettings();}
   if(!host)document.body.classList.remove('panel-open');
   if(!host&&!currentMe&&!modalDismissed&&!sessionStorage.getItem('svo_spectate')){openModal('join');modalDismissed=true;}
   isFirstRender=false;
@@ -165,9 +184,9 @@ function renderBoard(){
 function renderStage(){
   const stage=$('questionStage'),active=state.active,area=document.querySelector('.play-area');
   const q=active&&state.questions.find(q=>q.id===active.questionId);
-  if(!q){stage.classList.add('hidden');area.classList.remove('in-question');document.body.classList.remove('question-open');lastQuestionId='';return;}
+  if(!q){stage.classList.add('hidden');stage.classList.remove('answer-view');area.classList.remove('in-question');document.body.classList.remove('question-open');lastQuestionId='';return;}
   const change=lastQuestionId!==q.id;
-  stage.classList.remove('hidden');area.classList.add('in-question');document.body.classList.add('question-open');
+  stage.classList.remove('hidden');stage.classList.toggle('answer-view',!!active.reveal);area.classList.add('in-question');document.body.classList.add('question-open');
   if(change){stage.style.animation='none';stage.offsetHeight;stage.style.animation='';lastQuestionId=q.id;}
   const cat=state.categories.find(c=>c.id===q.categoryId);
   setText('stageCategory',(cat?.name||'Категория').toUpperCase());
@@ -179,6 +198,9 @@ function renderStage(){
   answer.classList.toggle('hidden',!active.reveal);
   setText('answerText',show&&active.reveal?(q.answer||''):'');
   const p=state.players.find(p=>p.id===active.playerId);
+  const focused=$('activeAnswerer');
+  focused.classList.toggle('hidden',!state.host||!p||active.reveal||active.finished);
+  if(p)focused.textContent=p.name;
   setText('answeringText',active.finished?'ВОПРОС ЗАВЕРШЁН':p?'ОТВЕЧАЕТ: '+p.name.toUpperCase():'ВЕДУЩИЙ ВЫБИРАЕТ ИГРОКА');
   updateTimer();renderBuzz();
 }
@@ -210,6 +232,38 @@ function animateNumber(node,start,end){
     node.textContent=fmt(Math.round(start+(end-start)*ease));if(progress<1)requestAnimationFrame(step);};
   requestAnimationFrame(step);
 }
+function renderHostRoster(){
+  const root=$('rosterList');root.replaceChildren();
+  const players=[...state.players].sort((a,b)=>b.score-a.score||a.joinedAt-b.joinedAt);
+  setText('rosterCount',players.length);
+  if(!players.length){root.append(dom('div','roster-empty','Ожидаем подключения игроков'));return;}
+  for(const [i,p] of players.entries()){
+    const active=state.active?.playerId===p.id&&!state.active?.finished&&!state.active?.reveal;
+    const pending=(state.active?.buzzQueue||[]).indexOf(p.id)>=0;
+    const row=dom('div','roster-player'+(active?' roster-active':'')+(pending?' roster-queued':''));
+    row.append(dom('span','roster-rank',String(i+1).padStart(2,'0')));
+    row.append(dom('span','roster-name',p.name));
+    row.append(dom('span','roster-score',fmt(p.score)));
+    root.append(row);
+  }
+}
+function renderRedBuzzer(){
+  const a=state?.active,button=$('redBuzzer');
+  const mine=state?.players.find(p=>p.id===myId);
+  const canBuzz=!!mine&&!state.host&&!!a&&!a.reveal&&!a.finished&&!state.blank &&
+    !((a.triedIds||[]).includes(myId))&&!((a.buzzQueue||[]).includes(myId))&&a.playerId!==myId;
+  button.disabled=!canBuzz||redBusy;
+  button.classList.toggle('red-buzzer-active',!!a&&a.playerId===myId);
+  button.classList.toggle('red-buzzer-queued',!!a&&(a.buzzQueue||[]).includes(myId));
+  button.setAttribute('aria-label',!a?'Красная кнопка — ожидание вопроса':a.playerId===myId?'Вы отвечаете':canBuzz?'Нажать для ответа':'Нажатие зарегистрировано');
+}
+$('redBuzzer').onclick=async()=>{
+  if(redBusy||!myId||!myToken||state?.host)return;
+  redBusy=true;renderRedBuzzer();
+  try{await request('/api/buzz',{playerId:myId,token:myToken});}
+  catch(e){console.warn('Нажатие отклонено:',e.message);}
+  finally{redBusy=false;renderRedBuzzer();}
+};
 function renderScoreboard(prev){
   const board=$('scoreboard'),players=[...state.players].sort((a,b)=>b.score-a.score||a.joinedAt-b.joinedAt);
   const oldScores=new Map(lastScores);board.replaceChildren();

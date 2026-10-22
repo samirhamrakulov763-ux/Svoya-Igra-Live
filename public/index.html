@@ -29,6 +29,7 @@
       <div id="mainLayout" class="main-layout">
         <main class="play-area">
           <div class="section-line"><div><span class="section-marker">01</span><span>ИГРОВОЕ ПОЛЕ</span></div><span id="boardHint" class="section-hint">ВЫБЕРИТЕ ВОПРОС, ЧТОБЫ НАЧАТЬ</span></div>
+          <section id="hostRoster" class="host-roster hidden" aria-label="Игроки и результаты"><div class="roster-title">УЧАСТНИКИ <span id="rosterCount">0</span></div><div id="rosterList" class="roster-list"></div><div class="roster-hint">3 — инструменты · 1 / 0 — баллы</div></section>
           <div class="board-shell"><div class="board-shell-top"><div class="board-shell-title"><span class="board-shell-diamond">◆</span> THE GAME BOARD <span class="board-shell-sep">/</span> <span class="board-shell-light">ВЫБЕРИ СВОЙ ВЫЗОВ</span></div><div class="board-shell-deco"><span></span><span></span><span></span></div></div><div id="board" class="board" aria-label="Игровое поле"></div><div class="board-shell-bottom"><span>✦</span> <span>ВРЕМЯ ПОКАЗАТЬ, НА ЧТО ТЫ СПОСОБЕН</span><span class="board-shell-bottom-right">EST. 2026 / QUIZ CLUB</span></div></div>
           <div class="under-board"><span class="legend-mark">✧</span><span>Самые смелые выбирают высокие ставки.</span><span id="usedStat">0 / 25 СЫГРАНО</span></div><div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
           <div id="questionStage" class="question-stage hidden" aria-live="polite">
@@ -38,6 +39,7 @@
             <div class="question-divider"></div>
             <div id="questionText" class="question-text"></div>
             <div id="answerText" class="answer-text hidden"></div>
+            <div id="activeAnswerer" class="active-answerer hidden" aria-live="polite"></div>
             <div id="buzzArea" class="buzz-area hidden"><button type="button" id="buzzBtn" class="buzz-btn">⚡ ОТВЕТИТЬ ПЕРВЫМ</button><div id="buzzStatus" class="buzz-status">Нажми раньше остальных, чтобы получить право ответа</div></div>
             <div class="question-foot"><span id="answeringText">ВЫБИРАЕМ ИГРОКА</span><div id="timerPill" class="timer-pill hidden">◷ <span id="timerNum">30</span> сек</div></div><div id="stageClockTrack" class="stage-clock-track hidden"><div id="stageClockFill"></div></div>
           </div>
@@ -52,7 +54,7 @@
             <div class="panel-label">ТЕКУЩИЙ ВОПРОС <span id="currentState">НЕТ</span></div>
             <div id="currentInfo" class="current-info">Выберите вопрос на игровом поле, чтобы начать.</div>
             <div class="panel-label">КТО ОТВЕЧАЕТ</div><div id="playerPicker" class="player-picker"></div>
-            <div class="shortcut-hint"><kbd>1</kbd> — верно, <kbd>0</kbd> — неверно (работает и с NumPad)</div>
+            <div class="shortcut-hint"><kbd>3</kbd> Пульт · <kbd>1</kbd> Верно · <kbd>0</kbd> Неверно <div class="key-help">→ ответ / поле · ← назад · ↑ скрыть · ↓ вернуть</div></div>
             <div class="decision-row"><button id="correctBtn" class="decision correct" disabled><span class="decision-icon">✓</span><span>Правильно<small id="correctAmount">+300 ОЧКОВ</small></span></button><button id="wrongBtn" class="decision wrong" disabled><span class="decision-icon">✕</span><span>Неправильно<small id="wrongAmount">−300 ОЧКОВ</small></span></button></div>
             <div class="action-grid"><button id="skipBtn" class="action-btn" disabled>→ Следующий</button><button id="revealBtn" class="action-btn" disabled>◉ Показать ответ</button><button id="timerBtn" class="action-btn" disabled>◷ Таймер 30с</button><button id="closeBtn" class="action-btn" disabled>□ Завершить вопрос</button></div>
             <button id="undoBtn" class="undo-btn">↶ Отменить последнее начисление</button>
@@ -73,7 +75,7 @@
             <div class="panel-label">НАСТРОЙКИ КОМНАТЫ</div>
             <label class="field-label" for="titleInput">Название игры</label><div class="inline-field"><input id="titleInput" placeholder="Своя игра"/><button id="saveTitle" class="gold-square">✓</button></div>
             <div class="info-box"><span>◈</span><div><strong>Присоединение игроков</strong><p>Игрокам достаточно открыть ссылку и ввести имя. Никаких аккаунтов.</p><div id="joinAddress" class="address"></div><button id="copyAddress" class="action-btn">Копировать ссылку</button></div></div>
-            <div class="panel-label with-space">УЧАСТНИКИ</div><div id="memberList" class="member-list"></div>
+            <div class="panel-label with-space">УЧАСТНИКИ — кнопка × удаляет игрока</div><div id="memberList" class="member-list"></div>
             <div class="panel-label with-space">УПРАВЛЕНИЕ РАУНДОМ</div>
             <button id="nextRound" class="action-btn full">↗ Следующий раунд (вернуть вопросы)</button>
             <button id="resetGame" class="action-btn full danger-text">↻ Новая игра: сбросить очки и вопросы</button>
@@ -85,6 +87,8 @@
     <button id="menuToggle" type="button" title="Меню: игрок или ведущий" aria-label="Открыть меню" aria-expanded="false">⚙</button>
     <footer class="bottom-bar"><span>✦ СВОЯ ИГРА <small>© LIVE QUIZ</small></span><div><span id="footerStatus">ОЖИДАНИЕ УЧАСТНИКОВ</span><span class="footer-divider"></span>ИГРАЙ. ДУМАЙ. ПОБЕЖДАЙ.</div></footer>
   </div>
+  <div id="playerConsole" class="player-console hidden"><button id="redBuzzer" class="red-buzzer" type="button" aria-label="Нажать для ответа"></button></div>
+  <div id="blankLayer" class="blank-layer hidden" aria-hidden="true"></div>
   <div id="flashLayer" class="flash-layer" aria-hidden="true"></div>
   <div id="toastArea" class="toast-area"></div>
   <div id="modalCover" class="modal-cover hidden">

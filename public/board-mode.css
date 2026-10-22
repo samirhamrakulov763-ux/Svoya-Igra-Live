@@ -696,3 +696,29 @@ body.question-open.result-preview .simple-result{
   body.host-mode .roster-score{font-size:clamp(27px,6.1vw,35px)!important}
   body.host-mode .roster-player{min-height:55px!important}
 }
+
+
+/* One secret wager question — controls only appear inside the host drawer. */
+.wager-panel:not(.hidden){display:block;margin:12px 0 16px;padding:14px;border-radius:11px;background:#174c9c}
+.wager-notice{font:800 13px/1.5 Manrope,sans-serif;color:#ffda4b;margin-bottom:10px}
+.wager-input-row{display:flex;gap:8px;align-items:center}
+.wager-input-row input{min-width:0;flex:1;width:90px;font:800 19px Outfit,sans-serif}
+.wager-input-row button{flex-shrink:0;padding:10px 12px;white-space:nowrap}
+#surprisePicker{margin:10px 0}
+#surpriseSave{margin-bottom:10px}
+#surpriseStatus{margin:2px 0 14px;line-height:1.5}
+.question-stage:not(.hidden) .question-value.surprise-value{
+  font-size:clamp(31px,4.2vw,62px)!important;
+  letter-spacing:.4px!important;
+}
+@media(max-width:700px){
+ .question-stage:not(.hidden) .question-value.surprise-value{font-size:clamp(27px,7.5vw,47px)!important}
+}
+
+
+/* Keep the live question readable while the host edits a surprise wager. */
+@media(min-width:1100px){
+  body.host-mode.panel-open.question-open .question-stage:not(.hidden){
+    padding-right:clamp(405px,29vw,475px)!important;
+  }
+}

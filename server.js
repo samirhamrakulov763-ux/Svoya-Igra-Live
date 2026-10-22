@@ -47,7 +47,7 @@ function makeDefault() {
   seeds.forEach(([,rows],i)=>rows.forEach(([text,answer],j)=>questions.push({
     id:uuid(),categoryId:categories[i].id,points:(j+1)*100,text,answer,used:false
   })));
-  return {title:'Своя игра',round:1,categories,questions,players:[],active:null,recent:null,blank:false,revision:0,updatedAt:Date.now()};
+  return {title:'Своя игра',round:1,categories,questions,players:[],active:null,recent:null,blank:false,surpriseQuestionId:null,surprisePlayed:false,revision:0,updatedAt:Date.now()};
 }
 let config;
 if(process.env.HOST_PIN){
@@ -82,7 +82,8 @@ function publicState(host=false) {
       ...(host||game.active?.reveal&&game.active?.questionId===q.id? {answer:q.answer}: {})
     })),
     players:game.players.map(({joinKey,...p})=>p),active:game.active,blank:!!game.blank,recent:game.recent||null,revision:game.revision,
-    updatedAt:game.updatedAt,host
+    updatedAt:game.updatedAt,host,
+    ...(host?{surpriseQuestionId:game.surpriseQuestionId||null,surprisePlayed:!!game.surprisePlayed}:{})
   };
 }
 function respond(res,status,data,headers={}){
@@ -118,15 +119,19 @@ function action(body){
   const type=body.type; let effect=null;
   switch(type){
     case 'open': {
+      if(game.active)fail(409,'Сначала завершите текущий вопрос');
       const q=question(body.questionId);
       if(q.used)fail(400,'Этот вопрос уже сыгран');
+      const surprise=!game.surprisePlayed&&game.surpriseQuestionId===q.id;
+      if(surprise)game.surprisePlayed=true;
       game.recent=null;
-      game.active={questionId:q.id,playerId:game.players.some(p=>p.id===body.playerId)?body.playerId:null,buzzQueue:[],triedIds:[],reveal:false,finished:false,openedAt:Date.now(),timerEnd:null};
+      game.active={questionId:q.id,playerId:surprise?null:game.players.some(p=>p.id===body.playerId)?body.playerId:null,buzzQueue:[],triedIds:[],surprise,wager:null,reveal:false,finished:false,openedAt:Date.now(),timerEnd:null};
       effect={kind:'open',questionId:q.id,points:q.points,at:Date.now()};
       break;
     }
     case 'selectPlayer': {
       if(!game.active||game.active.finished)fail(400,'Нет активного вопроса');
+      if(game.active.surprise)fail(409,'На сюрприз отвечает только первый нажавший кнопку');
       const p=player(body.playerId);
       if((game.active.triedIds||[]).includes(p.id))fail(400,'Этот игрок уже отвечал неправильно');
       game.active.buzzQueue=(game.active.buzzQueue||[]).filter(id=>id!==p.id);
@@ -137,15 +142,24 @@ function action(body){
       if(!game.active||game.active.finished)fail(400,'Нет активного вопроса');
       if(!game.active.playerId)fail(400,'Сначала выберите игрока');
       const p=player(game.active.playerId),q=question(game.active.questionId);
-      p.score+=q.points;q.used=true;game.active.finished=true;game.active.timerEnd=null;
-      effect={kind:'correct',playerId:p.id,name:p.name,delta:q.points,score:p.score,at:Date.now()};break;
+      const delta=game.active.surprise?game.active.wager:q.points;
+      if(!Number.isInteger(delta)||delta<0)fail(409,'Сначала установите ставку для сюрприза');
+      p.score+=delta;q.used=true;game.active.finished=true;game.active.timerEnd=null;
+      effect={kind:'correct',playerId:p.id,name:p.name,delta,score:p.score,at:Date.now()};break;
     }
     case 'wrong': {
       if(!game.active||game.active.finished)fail(400,'Нет активного вопроса');
       if(!game.active.playerId)fail(400,'Сначала выберите игрока');
       const p=player(game.active.playerId),q=question(game.active.questionId);
-      p.score-=q.points;
+      const delta=game.active.surprise?game.active.wager:q.points;
+      if(!Number.isInteger(delta)||delta<0)fail(409,'Сначала установите ставку для сюрприза');
+      p.score-=delta;
       const a=game.active;
+      if(a.surprise){
+        q.used=true;a.finished=true;a.timerEnd=null;a.buzzQueue=[];
+        effect={kind:'wrong',playerId:p.id,name:p.name,delta:-delta,score:p.score,nextId:null,nextName:null,at:Date.now()};
+        break;
+      }
       a.triedIds=a.triedIds||[];
       if(!a.triedIds.includes(p.id))a.triedIds.push(p.id);
       a.buzzQueue=(a.buzzQueue||[]).filter(id=>id!==p.id);
@@ -156,6 +170,7 @@ function action(body){
     }
     case 'skip': {
       if(!game.active||game.active.finished)fail(400,'Нет активного вопроса');
+      if(game.active.surprise)fail(409,'Сюрприз предназначен только первому нажавшему');
       const a=game.active;
       const old=a.playerId;
       a.buzzQueue=(a.buzzQueue||[]).filter(id=>id!==old);
@@ -199,6 +214,25 @@ function action(body){
     case 'blank': {
       game.blank=!!body.enabled;
       effect={kind:'blank',enabled:game.blank,at:Date.now()};
+      break;
+    }
+    case 'setSurprise': {
+      if(game.round!==1||game.active||game.recent||game.questions.some(q=>q.used)||game.surprisePlayed)
+        fail(409,'Выберите сюрприз до начала игры');
+      const id=body.questionId||null;
+      if(id){const q=question(id);if(q.used)fail(409,'Вопрос уже сыгран');}
+      game.surpriseQuestionId=id;
+      break;
+    }
+    case 'setWager': {
+      const a=game.active;
+      if(!a||!a.surprise||a.finished||a.reveal||!a.playerId)
+        fail(409,'Сейчас нельзя сделать ставку');
+      if(a.wager!==null)fail(409,'Ставка уже зафиксирована');
+      const p=player(a.playerId),stake=Number(body.amount),available=Math.max(0,p.score);
+      if(!Number.isSafeInteger(stake)||stake<0||stake>available)
+        fail(400,'Ставка должна быть от 0 до '+available+' баллов');
+      a.wager=stake;
       break;
     }
     case 'reveal': {
@@ -248,7 +282,9 @@ function action(body){
       if(game.active?.questionId===body.id)fail(400,'Сначала закройте этот вопрос');
       const index=game.questions.findIndex(q=>q.id===body.id);
       if(index<0)fail(404,'Вопрос не найден');
-      game.questions.splice(index,1);break;
+      game.questions.splice(index,1);
+      if(game.surpriseQuestionId===body.id)game.surpriseQuestionId=null;
+      break;
     }
     case 'saveCategory': {
       const name=txt(body.name,38);if(!name)fail(400,'Введите название категории');
@@ -261,12 +297,14 @@ function action(body){
       if(game.active&&game.questions.some(q=>q.id===game.active.questionId&&q.categoryId===body.id))fail(400,'Сначала закройте вопрос');
       game.categories=game.categories.filter(c=>c.id!==body.id);
       game.questions=game.questions.filter(q=>q.categoryId!==body.id);
+      if(!game.questions.some(q=>q.id===game.surpriseQuestionId))game.surpriseQuestionId=null;
       break;
     }
     case 'reset':{
       game.questions.forEach(q=>q.used=false);
       game.players.forEach(p=>p.score=0);
       game.active=null;game.recent=null;game.blank=false;game.round=1;game.history=[];
+      game.surpriseQuestionId=null;game.surprisePlayed=false;
       effect={kind:'reset',at:Date.now()};break;
     }
     case 'nextRound':{
@@ -368,6 +406,7 @@ const server=http.createServer(async(req,res)=>{
         a.triedIds=a.triedIds||[];
         a.buzzQueue=a.buzzQueue||[];
         if(a.triedIds.includes(p.id))fail(409,'Вы уже отвечали на этот вопрос');
+        if(a.surprise&&a.playerId&&a.playerId!==p.id)fail(409,'На сюрприз отвечает только первый игрок');
         if(a.playerId===p.id)return respond(res,200,{ok:true,position:0});
         if(a.buzzQueue.includes(p.id))return respond(res,200,{ok:true,position:a.buzzQueue.indexOf(p.id)+1});
         let effect=null;
@@ -378,12 +417,18 @@ const server=http.createServer(async(req,res)=>{
       }
       if(pathname==='/api/action'){
         requireHost(req);
-        if(['correct','wrong','adjust'].includes(body.type)){
+        const recordHistory=['correct','wrong','adjust'].includes(body.type);
+        const prior=recordHistory?{
+          players:JSON.parse(JSON.stringify(game.players)),
+          questions:JSON.parse(JSON.stringify(game.questions)),
+          active:game.active?JSON.parse(JSON.stringify(game.active)):null
+        }:null;
+        const effect=action(body);
+        if(prior){
           game.history=game.history||[];
-          game.history.push({players:JSON.parse(JSON.stringify(game.players)),questions:JSON.parse(JSON.stringify(game.questions)),active:game.active?JSON.parse(JSON.stringify(game.active)):null});
+          game.history.push(prior);
           if(game.history.length>15)game.history.shift();
         }
-        const effect=action(body);
         pushState(effect);
         return respond(res,200,{ok:true});
       }

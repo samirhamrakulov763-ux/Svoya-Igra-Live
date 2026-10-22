@@ -168,7 +168,7 @@ function render(next){
   isFirstRender=false;
 }
 function renderBoard(){
-  const signature=JSON.stringify([state.host,state.active?.questionId,state.categories.map(c=>[c.id,c.name]),state.questions.map(q=>[q.id,q.categoryId,q.points,q.used])]);
+  const signature=JSON.stringify([state.host,state.active?.questionId,state.surpriseQuestionId,state.categories.map(c=>[c.id,c.name]),state.questions.map(q=>[q.id,q.categoryId,q.points,q.used])]);
   if(signature===boardSignature)return;
   boardSignature=signature;
   const board=$('board');board.replaceChildren();
@@ -186,7 +186,7 @@ function renderBoard(){
       const q=state.questions.find(q=>q.categoryId===c.id&&q.points===pts);
       const tile=dom('button','q-tile'+(state.host?' host-tile':'')+(!q||q.used?' used':'')+(state.active?.questionId===q?.id?' is-active':''));
       tile.type='button';tile.disabled=!state.host||!q||q.used||!!state.active;
-      tile.title=q?(state.host?q.text:'Вопрос '+pts+' очков'):'Вопрос не добавлен';
+      tile.title=q?(state.host?(q.id===state.surpriseQuestionId?'СЮРПРИЗ · ':'')+q.text:'Вопрос '+pts+' очков'):'Вопрос не добавлен';
       if(q){tile.append(dom('span','',fmt(pts)));}
       if(state.host&&q&&!q.used)tile.onclick=()=>send({type:'open',questionId:q.id});
       col.append(tile);
@@ -204,7 +204,8 @@ function renderStage(){
   if(change)lastQuestionId=q.id;
   const cat=state.categories.find(c=>c.id===q.categoryId);
   setText('stageCategory',(cat?.name||'Категория').toUpperCase());
-  $('questionValue').textContent=fmt(q.points);
+  $('questionValue').textContent=active.surprise?(active.wager===null?'СЮРПРИЗ':'СТАВКА '+fmt(active.wager)):fmt(q.points);
+  $('questionValue').classList.toggle('surprise-value',!!active.surprise);
   setText('questionText',q.text||'');
   const answer=$('answerText');
   const show=!!(active.reveal||state.host);
@@ -266,6 +267,7 @@ function renderRedBuzzer(){
   const a=state?.active,button=$('redBuzzer');
   const mine=state?.players.find(p=>p.id===myId);
   const canBuzz=!!mine&&!state.host&&!!a&&!a.reveal&&!a.finished&&!state.blank &&
+    !(a.surprise&&a.playerId) &&
     !((a.triedIds||[]).includes(myId))&&!((a.buzzQueue||[]).includes(myId))&&a.playerId!==myId;
   button.disabled=!canBuzz||redBusy;
   button.classList.toggle('red-buzzer-active',!!a&&a.playerId===myId);
@@ -323,6 +325,7 @@ function handleEffect(e){
 }
 function scoreWithFeedback(kind){
   if(keyBusy)return Promise.resolve(false);
+  if(state?.active?.surprise && state.active.wager===null){toast('Сначала зафиксируйте ставку сюрприза',true);return Promise.resolve(false);}
   keyBusy=true;
   pendingResult={kind,at:Date.now()};
   showResult(kind);
@@ -331,17 +334,87 @@ function scoreWithFeedback(kind){
     return ok;
   }).finally(()=>{keyBusy=false;});
 }
+let lastWagerPlayer='';
+function renderWagerPanel(){
+  const a=state?.active,p=a&&state.players.find(p=>p.id===a.playerId);
+  const box=$('wagerPanel'),notice=$('wagerNotice'),amount=$('wagerAmount');
+  box.classList.toggle('hidden',!a?.surprise);
+  if(!a?.surprise){lastWagerPlayer='';return;}
+  if(!p){
+    notice.textContent='СЮРПРИЗ • ждём первого нажавшего';
+    amount.disabled=true;
+    $('wagerMax').disabled=true;
+    $('wagerApply').disabled=true;
+    return;
+  }
+  const max=Math.max(0,p.score);
+  if(a.playerId!==lastWagerPlayer){
+    lastWagerPlayer=a.playerId;
+    amount.value=String(max);
+  }
+  amount.max=String(max);
+  const fixed=a.wager!==null;
+  notice.textContent=fixed
+    ? p.name+' • ставка '+fmt(a.wager)+' из '+fmt(max)+' очков'
+    : p.name+' • можно поставить от 0 до '+fmt(max)+' очков';
+  amount.disabled=fixed||!!a.finished||!!a.reveal;
+  $('wagerMax').disabled=amount.disabled;
+  $('wagerApply').disabled=amount.disabled;
+}
+$('wagerMax').onclick=()=>{
+  const p=state?.players.find(p=>p.id===state.active?.playerId);
+  if(p)$('wagerAmount').value=String(Math.max(0,p.score));
+};
+$('wagerApply').onclick=async()=>{
+  const raw=$('wagerAmount').value,amount=Number(raw);
+  if(raw.trim()===''||!Number.isSafeInteger(amount)||amount<0)
+    return toast('Введите целое число от 0 до накопленных баллов',true);
+  $('wagerApply').disabled=true;
+  try{await request('/api/action',{type:'setWager',amount});}
+  catch(e){toast(e.message,true);$('wagerApply').disabled=false;}
+};
+function renderSurpriseSettings(){
+  const picker=$('surprisePicker'),save=$('surpriseSave'),status=$('surpriseStatus');
+  const allowed=state.round===1&&!state.active&&!state.recent&&!state.surprisePlayed&&!state.questions.some(q=>q.used);
+  if(!picker.dataset.dirty){
+    picker.replaceChildren(new Option('Без сюрприза',''));
+    for(const q of state.questions){
+      const cat=state.categories.find(c=>c.id===q.categoryId)?.name||'Категория';
+      picker.add(new Option(cat+' · '+fmt(q.points)+' — '+q.text.slice(0,45),q.id));
+    }
+    picker.value=state.surpriseQuestionId||'';
+  }
+  picker.disabled=!allowed;save.disabled=!allowed;
+  if(!allowed)status.textContent=state.surprisePlayed
+    ? 'Секретный вопрос уже раскрыт. Для новой игры сбросьте прогресс.'
+    : 'Чтобы выбрать сюрприз, сначала начните новую игру.';
+  else status.textContent=state.surpriseQuestionId
+    ? 'Секретный вопрос выбран. Игрокам он не виден.'
+    : 'Выберите один вопрос до начала игры. Ставку установите после первого нажатия.';
+}
+$('surprisePicker').onchange=()=>{$('surprisePicker').dataset.dirty='1';};
+$('surpriseSave').onclick=async()=>{
+  const picker=$('surprisePicker');
+  try{
+    await request('/api/action',{type:'setSurprise',questionId:picker.value||null});
+    delete picker.dataset.dirty;
+    toast(picker.value?'Секретный вопрос выбран':'Сюрприз отключён');
+    await reloadState();
+  }catch(e){toast(e.message,true);}
+};
 function renderControl(){
   const a=state.active,q=a&&state.questions.find(q=>q.id===a.questionId);
   setText('currentState',!q?'НЕТ':a.finished?'ГОТОВО':'АКТИВЕН');
   const ci=$('currentInfo');ci.replaceChildren();
   if(!q)ci.textContent='Выберите вопрос на игровом поле, чтобы начать.';
   else {
-    ci.append(dom('strong','',fmt(q.points)+' ОЧКОВ • '+(state.categories.find(c=>c.id===q.categoryId)?.name||'')),dom('div','',q.text||''));
+    ci.append(dom('strong','',(a.surprise?'СЮРПРИЗ':fmt(q.points)+' ОЧКОВ')+' • '+(state.categories.find(c=>c.id===q.categoryId)?.name||'')),dom('div','',q.text||''));
     ci.append(dom('div','', 'Ответ: '+(q.answer||'')));
   }
-  $('correctAmount').textContent='+'+fmt(q?.points||0)+' ОЧКОВ';
-  $('wrongAmount').textContent='−'+fmt(q?.points||0)+' ОЧКОВ';
+  const earned=a?.surprise?(a.wager===null?'?':fmt(a.wager)):fmt(q?.points||0);
+  $('correctAmount').textContent='+'+earned+' ОЧКОВ';
+  $('wrongAmount').textContent='−'+earned+' ОЧКОВ';
+  renderWagerPanel();
   const picker=$('playerPicker');picker.replaceChildren();
   if(a&&!a.finished){
     const note=dom('div','editor-hint','Очередь: '+((a.buzzQueue||[]).map(id=>state.players.find(p=>p.id===id)?.name).filter(Boolean).join(' → ')||'пока пусто'));
@@ -349,12 +422,13 @@ function renderControl(){
   }
   for(const p of state.players){
     const btn=dom('button','picker-btn'+(a?.playerId===p.id?' selected':''),p.name);
-    btn.disabled=!q||a.finished;btn.onclick=()=>send({type:'selectPlayer',playerId:p.id});picker.append(btn);
+    btn.disabled=!q||a.finished||!!a.surprise;btn.onclick=()=>send({type:'selectPlayer',playerId:p.id});picker.append(btn);
   }
   if(!state.players.length)picker.append(dom('div','editor-hint','Нет игроков'));
   for(const id of ['correctBtn','wrongBtn','skipBtn','revealBtn','timerBtn','closeBtn'])$(id).disabled=!q||(a.finished&&!['revealBtn','closeBtn'].includes(id));
-  $('correctBtn').disabled||=!(a?.playerId);
-  $('wrongBtn').disabled||=!(a?.playerId);
+  $('correctBtn').disabled||=!(a?.playerId)||!!(a?.surprise&&a.wager===null);
+  $('wrongBtn').disabled||=!(a?.playerId)||!!(a?.surprise&&a.wager===null);
+  if(a?.surprise)$('skipBtn').disabled=true;
   $('revealBtn').textContent=a?.reveal?'◉ Скрыть ответ':'◉ Показать ответ';
   $('timerBtn').textContent=a?.timerEnd?'◷ Сбросить таймер':'◷ Таймер 30с';
   const manual=$('manualPlayer'),selected=manual.value;
@@ -399,6 +473,7 @@ $('saveQuestion').onclick=async()=>{
 };
 $('deleteQuestion').onclick=()=>{if(!editorQuestionId)return;if(confirm('Удалить выбранный вопрос?'))send({type:'deleteQuestion',id:editorQuestionId});};
 function renderSettings(){
+  renderSurpriseSettings();
   if(document.activeElement!==$('titleInput'))$('titleInput').value=state.title;
   const address=location.origin;setText('joinAddress',address);
   const members=$('memberList');members.replaceChildren();

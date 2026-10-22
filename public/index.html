@@ -55,6 +55,7 @@
             <div id="currentInfo" class="current-info">Выберите вопрос на игровом поле, чтобы начать.</div>
             <div class="panel-label">КТО ОТВЕЧАЕТ</div><div id="playerPicker" class="player-picker"></div>
             <div class="shortcut-hint"><kbd>3</kbd> Пульт · <kbd>1</kbd> Верно · <kbd>0</kbd> Неверно <div class="key-help">→ ответ / поле · ← назад · ↑ скрыть · ↓ вернуть</div></div>
+            <div id="wagerPanel" class="wager-panel hidden"><div id="wagerNotice" class="wager-notice">Сюрприз: ждём первого игрока</div><div class="wager-input-row"><input id="wagerAmount" type="number" min="0" step="1" inputmode="numeric" placeholder="Ставка"/><button id="wagerMax" type="button" class="action-btn">Всё</button><button id="wagerApply" type="button" class="gold-btn">Поставить</button></div></div>
             <div class="decision-row"><button id="correctBtn" class="decision correct" disabled><span class="decision-icon">✓</span><span>Правильно<small id="correctAmount">+300 ОЧКОВ</small></span></button><button id="wrongBtn" class="decision wrong" disabled><span class="decision-icon">✕</span><span>Неправильно<small id="wrongAmount">−300 ОЧКОВ</small></span></button></div>
             <div class="action-grid"><button id="skipBtn" class="action-btn" disabled>→ Следующий</button><button id="revealBtn" class="action-btn" disabled>◉ Показать ответ</button><button id="timerBtn" class="action-btn" disabled>◷ Таймер 30с</button><button id="closeBtn" class="action-btn" disabled>□ Завершить вопрос</button></div>
             <button id="undoBtn" class="undo-btn">↶ Отменить последнее начисление</button>
@@ -75,6 +76,7 @@
             <div class="panel-label">НАСТРОЙКИ КОМНАТЫ</div>
             <label class="field-label" for="titleInput">Название игры</label><div class="inline-field"><input id="titleInput" placeholder="Своя игра"/><button id="saveTitle" class="gold-square">✓</button></div>
             <div class="info-box"><span>◈</span><div><strong>Присоединение игроков</strong><p>Игрокам достаточно открыть ссылку и ввести имя. Никаких аккаунтов.</p><div id="joinAddress" class="address"></div><button id="copyAddress" class="action-btn">Копировать ссылку</button></div></div>
+            <div class="panel-label with-space">СЕКРЕТНЫЙ ВОПРОС — ДО НАЧАЛА ИГРЫ</div><select id="surprisePicker" class="full-input"><option value="">Без сюрприза</option></select><button id="surpriseSave" class="action-btn full" type="button">Сохранить секретный вопрос</button><div id="surpriseStatus" class="editor-hint">Игроки не узнают выбор до открытия вопроса.</div>
             <div class="panel-label with-space">УЧАСТНИКИ — кнопка × удаляет игрока</div><div id="memberList" class="member-list"></div>
             <div class="panel-label with-space">УПРАВЛЕНИЕ РАУНДОМ</div>
             <button id="nextRound" class="action-btn full">↗ Следующий раунд (вернуть вопросы)</button>

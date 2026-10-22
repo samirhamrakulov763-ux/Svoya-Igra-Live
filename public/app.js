@@ -179,7 +179,7 @@ function renderBoard(){
   board.style.setProperty('--rows',values.length+1);
   for(const c of state.categories){
     const col=dom('div','category-col');
-    const categoryHead=dom('div','cat-title');
+    const categoryHead=dom('div','cat-title'+(c.name.length>=10?' cat-title-long':''));
     categoryHead.append(dom('span','cat-name',c.name));
     col.append(categoryHead);
     for(const pts of values){
@@ -257,7 +257,7 @@ function renderHostRoster(){
     const active=state.active?.playerId===p.id&&!state.active?.finished&&!state.active?.reveal;
     const pending=(state.active?.buzzQueue||[]).indexOf(p.id)>=0;
     const row=dom('div','roster-player'+(active?' roster-active':'')+(pending?' roster-queued':''));
-    row.append(dom('span','roster-name',p.name));
+    row.append(dom('span','roster-name'+(p.name.length>=10?' roster-name-long':''),p.name));
     row.append(dom('span','roster-score',fmt(p.score)));
     root.append(row);
   }

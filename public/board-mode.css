@@ -634,3 +634,54 @@ body.result-preview .play-area .board{filter:none!important;transform:none!impor
     to{opacity:1;transform:translateY(-9vh)}
   }
 }
+
+
+/* October refinement: readable game labels, correct in-question result overlay. */
+body.host-mode:not(.question-open) .cat-title{
+  font-size:clamp(19px,1.65vw,29px)!important;
+  font-weight:900!important;
+  letter-spacing:-.35px!important;
+  line-height:1.1!important;
+}
+body.host-mode .roster-name{
+  font-size:clamp(18px,1.5vw,26px)!important;
+  line-height:1.15!important;
+  font-weight:800!important;
+}
+body.host-mode .roster-score{
+  font-size:clamp(22px,1.85vw,32px)!important;
+  font-weight:900!important;
+  font-variant-numeric:tabular-nums;
+}
+body.host-mode .roster-player{
+  min-height:56px!important;
+  padding:11px 13px!important;
+}
+body.question-open.result-preview .question-stage:not(.hidden){
+  display:grid!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+body.question-open.result-preview .question-stage .question-text,
+body.question-open.result-preview .question-stage .question-value,
+body.question-open.result-preview .question-stage .active-answerer{
+  visibility:hidden!important;
+}
+body.question-open.result-preview .flash-layer{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:0!important;
+  background:transparent!important;
+}
+body.question-open.result-preview .simple-result{
+  font-size:clamp(48px,7vw,112px)!important;
+}
+@media(max-width:850px){
+  body.host-mode:not(.question-open) .cat-title{
+    font-size:clamp(12px,2.35vw,21px)!important;
+  }
+  body.host-mode .roster-name{font-size:clamp(17px,3.8vw,22px)!important}
+  body.host-mode .roster-score{font-size:clamp(20px,4.5vw,27px)!important}
+  body.host-mode .roster-player{min-height:47px!important}
+}

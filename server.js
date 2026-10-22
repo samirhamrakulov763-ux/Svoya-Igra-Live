@@ -91,16 +91,21 @@ function respond(res,status,data,headers={}){
   res.end(body);
 }
 function emit(res,name,payload) {
-  try {res.write('event: '+name+'\ndata: '+JSON.stringify(payload)+'\n\n');} catch {subscribers.delete(res);}
+  try {res.write('event: '+name+'\ndata: '+(typeof payload==='string'?payload:JSON.stringify(payload))+'\n\n');}
+  catch {subscribers.delete(res);}
 }
 function pushState(effect=null){
   game.revision++; game.updatedAt=Date.now();
   const tmp=STATE_FILE+'.tmp';
-  fs.writeFileSync(tmp,JSON.stringify(game,null,2),'utf8');
+  fs.writeFileSync(tmp,JSON.stringify(game),'utf8');
   fs.renameSync(tmp,STATE_FILE);
+  if(!subscribers.size)return;
+  const hostPayload=JSON.stringify(publicState(true));
+  const guestPayload=JSON.stringify(publicState(false));
+  const effectPayload=effect?JSON.stringify(effect):null;
   for(const s of subscribers) {
-    if(effect) emit(s.res,'effect',effect);
-    emit(s.res,'state',publicState(s.host));
+    if(effectPayload)emit(s.res,'effect',effectPayload);
+    emit(s.res,'state',s.host?hostPayload:guestPayload);
   }
 }
 function fail(status,message){const err=new Error(message);err.status=status;throw err;}

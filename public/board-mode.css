@@ -573,3 +573,64 @@ body.result-preview .flash-layer{
   border:0!important;
   font-size:clamp(32px,4vw,58px)!important;
 }
+
+
+/* Responsive answer feedback: flat color, a yellow nameplate, tiny transitions. */
+.active-answerer:not(.hidden){
+  background:#ffce2b!important;
+  color:#0b3278!important;
+  border:0!important;
+  border-radius:9px!important;
+  box-shadow:none!important;
+  text-shadow:none!important;
+  outline:none!important;
+  padding:12px 27px!important;
+  line-height:1.15!important;
+  white-space:nowrap;
+  animation:answererIn 180ms ease-out both!important;
+}
+@keyframes answererIn {
+  from{opacity:0;transform:translate(-50%,6px)}
+  to{opacity:1;transform:translate(-50%,0)}
+}
+.simple-result{
+  will-change:opacity,transform;
+  animation:resultQuick 850ms ease-out both!important;
+}
+@keyframes resultQuick {
+  0%{opacity:0;transform:translateY(7px)}
+  16%{opacity:1;transform:translateY(0)}
+  76%{opacity:1;transform:translateY(0)}
+  100%{opacity:0;transform:translateY(-4px)}
+}
+body.result-preview .flash-layer{background:transparent!important}
+body.result-preview .play-area .board{filter:none!important;transform:none!important}
+@media(prefers-reduced-motion:reduce){
+  .simple-result,.active-answerer:not(.hidden){animation:none!important}
+}
+
+
+/* Question changes appear immediately, with a light text fade only. */
+.question-stage:not(.hidden){
+  animation:none!important;
+}
+.question-stage:not(.hidden) .question-value{
+  animation:quickQuestionFade 180ms ease-out both!important;
+}
+.question-stage:not(.hidden) .question-text{
+  animation:quickQuestionFade 210ms ease-out both!important;
+  filter:none!important;
+}
+@keyframes quickQuestionFade{
+  from{opacity:.25}
+  to{opacity:1}
+}
+@media(min-width:741px) and (min-height:551px){
+  .question-stage:not(.hidden) .question-text{
+    animation:quickQuestionCentered 210ms ease-out both!important;
+  }
+  @keyframes quickQuestionCentered{
+    from{opacity:.3;transform:translateY(-9vh)}
+    to{opacity:1;transform:translateY(-9vh)}
+  }
+}

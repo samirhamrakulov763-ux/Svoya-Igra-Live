@@ -6,7 +6,8 @@ let state=null,ev=null,modalMode='join',activeTab='control',editorQuestionId='',
 let myId=localStorage.getItem('svo_player_id')||'';
 let myToken=localStorage.getItem('svo_player_token')||'';
 let lastScores=new Map(),isFirstRender=true,modalDismissed=false,lastDecisionKeyAt=0,keyBusy=false,redBusy=false;
-const setText=(id,value)=>{$(id).textContent=String(value);};
+let boardSignature='',rosterSignature='',pendingResult=null;
+const setText=(id,value)=>{const node=$(id),next=String(value);if(node.textContent!==next)node.textContent=next;};
 const all=['100','200','300','400','500'];
 function toast(message,error=false){
   const item=dom('div','toast'+(error?' error':''),message);$('toastArea').append(item);
@@ -21,8 +22,16 @@ async function request(endpoint,body){
   return out;
 }
 async function send(body){
-  try{await request('/api/action',body);}catch(e){toast(e.message,true);}
+  try{await request('/api/action',body);return true;}
+  catch(e){toast(e.message,true);return false;}
 }
+function refreshHostPanel(){
+  if(!state?.host||!document.body.classList.contains('panel-open'))return;
+  if(activeTab==='control')renderControl();
+  else if(activeTab==='editor')renderEditorOptions();
+  else if(activeTab==='settings')renderSettings();
+}
+function toggleHostPanel(){document.body.classList.toggle('panel-open');refreshHostPanel();}
 function connect(){
   ev?.close();ev=new EventSource('/api/events');
   ev.addEventListener('open',()=>{$('connection').textContent='ПРЯМОЙ ЭФИР';document.querySelector('.live-dot').classList.remove('offline');});
@@ -62,7 +71,7 @@ $('menuToggle').onclick=()=>{
   const shown=document.body.classList.toggle('menu-open');$('menuToggle').setAttribute('aria-expanded',String(shown));
 };
 $('closeHostPanel').onclick=()=>document.body.classList.remove('panel-open');
-$('stageCategory').onclick=()=>{if(state?.host&&state?.active)document.body.classList.toggle('panel-open');};
+$('stageCategory').onclick=()=>{if(state?.host&&state?.active)toggleHostPanel();};
 $('stageCategory').title='Ведущий: нажмите здесь, чтобы открыть пульт';
 document.addEventListener('click',e=>{
   if(document.body.classList.contains('menu-open')&&!e.target.closest('#menuToggle')&&!e.target.closest('.top-actions')){
@@ -84,7 +93,7 @@ document.addEventListener('keydown',e=>{
      $('modalCover').classList.contains('hidden') &&
      !e.target.closest('input,textarea,select,[contenteditable="true"]')){
     if(e.key==='3'||e.code==='Numpad3'){
-      e.preventDefault();document.body.classList.toggle('panel-open');return;
+      e.preventDefault();toggleHostPanel();return;
     }
     let action=null;
     if(e.key==='ArrowRight')action={type:'navigateRight'};
@@ -95,14 +104,15 @@ document.addEventListener('keydown',e=>{
     else if((e.key==='0'||e.code==='Numpad0')&&state.active&&!state.active.finished&&state.active.playerId&&!state.blank)action={type:'wrong'};
     if(action){
       e.preventDefault();
-      if(!keyBusy&&Date.now()-lastDecisionKeyAt>240){
+      if(action.type==='correct'||action.type==='wrong')scoreWithFeedback(action.type);
+      else if(!keyBusy&&Date.now()-lastDecisionKeyAt>110){
         keyBusy=true;lastDecisionKeyAt=Date.now();
         send(action).finally(()=>{keyBusy=false;});
       }
     }
   }
   if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==='h'){
-    e.preventDefault();if(state?.host)document.body.classList.toggle('panel-open');else openModal('host');
+    e.preventDefault();if(state?.host)toggleHostPanel();else openModal('host');
   }
 });
 $('modalForm').addEventListener('submit',async e=>{
@@ -111,7 +121,7 @@ $('modalForm').addEventListener('submit',async e=>{
   try{
     if(modalMode==='host'){
       await request('/api/login',{pin:value});toast('Режим ведущего активирован');closeModal();
-      await reloadState();document.body.classList.add('panel-open');connect();
+      await reloadState();document.body.classList.add('panel-open');refreshHostPanel();connect();
     }else{
       const result=await request('/api/join',{name:value,id:myId,token:myToken});
       myId=result.id;myToken=result.token;
@@ -122,7 +132,7 @@ $('modalForm').addEventListener('submit',async e=>{
 });
 async function reloadState(){const result=await fetch('/api/state');render(await result.json());}
 function render(next){
-  const prev=state;state=next;const host=state.host;
+  state=next;const host=state.host;
   $('hostPanel').classList.toggle('hidden',!host);$('mainLayout').classList.toggle('has-host',host);
   $('openHost').textContent=host?'♛ Пульт открыт':'◈ Ведущий';
   const currentMe=state.players.find(p=>p.id===myId);
@@ -149,14 +159,18 @@ function render(next){
   $('blankLayer').classList.toggle('hidden',!state.blank);
   $('playerConsole').classList.toggle('hidden',!playerOnly);
   $('hostRoster').classList.toggle('hidden',!host);
-  renderBoard();renderStage();renderScoreboard(prev);
-  renderHostRoster();renderRedBuzzer();
-  if(host){renderControl();renderEditorOptions();renderSettings();}
+  renderBoard();renderStage();
+  if(host)renderHostRoster();
+  renderRedBuzzer();
+  refreshHostPanel();
   if(!host)document.body.classList.remove('panel-open');
   if(!host&&!currentMe&&!modalDismissed&&!sessionStorage.getItem('svo_spectate')){openModal('join');modalDismissed=true;}
   isFirstRender=false;
 }
 function renderBoard(){
+  const signature=JSON.stringify([state.host,state.active?.questionId,state.categories.map(c=>[c.id,c.name]),state.questions.map(q=>[q.id,q.categoryId,q.points,q.used])]);
+  if(signature===boardSignature)return;
+  boardSignature=signature;
   const board=$('board');board.replaceChildren();
   board.style.setProperty('--cols',Math.max(1,state.categories.length));
   if(!state.categories.length){board.append(dom('div','board-empty','Ведущий пока не добавил категории.'));return;}
@@ -187,7 +201,7 @@ function renderStage(){
   if(!q){stage.classList.add('hidden');stage.classList.remove('answer-view');area.classList.remove('in-question');document.body.classList.remove('question-open');lastQuestionId='';return;}
   const change=lastQuestionId!==q.id;
   stage.classList.remove('hidden');stage.classList.toggle('answer-view',!!active.reveal);area.classList.add('in-question');document.body.classList.add('question-open');
-  if(change){stage.style.animation='none';stage.offsetHeight;stage.style.animation='';lastQuestionId=q.id;}
+  if(change)lastQuestionId=q.id;
   const cat=state.categories.find(c=>c.id===q.categoryId);
   setText('stageCategory',(cat?.name||'Категория').toUpperCase());
   $('questionValue').textContent=fmt(q.points);
@@ -233,8 +247,11 @@ function animateNumber(node,start,end){
   requestAnimationFrame(step);
 }
 function renderHostRoster(){
-  const root=$('rosterList');root.replaceChildren();
   const players=[...state.players].sort((a,b)=>b.score-a.score||a.joinedAt-b.joinedAt);
+  const signature=JSON.stringify([players.map(p=>[p.id,p.name,p.score]),state.active?.playerId,state.active?.finished,state.active?.reveal,state.active?.buzzQueue]);
+  if(signature===rosterSignature)return;
+  rosterSignature=signature;
+  const root=$('rosterList');root.replaceChildren();
   if(!players.length){root.append(dom('div','roster-empty','Ожидаем подключения игроков'));return;}
   for(const [i,p] of players.entries()){
     const active=state.active?.playerId===p.id&&!state.active?.finished&&!state.active?.reveal;
@@ -285,18 +302,34 @@ function renderScoreboard(prev){
   lastScores=new Map(state.players.map(p=>[p.id,p.score]));
 }
 let resultEffectTimer=null;
+function clearResult(){
+  clearTimeout(resultEffectTimer);
+  $('flashLayer').replaceChildren();
+  document.body.classList.remove('result-preview');
+}
+function showResult(kind){
+  clearTimeout(resultEffectTimer);
+  $('flashLayer').replaceChildren(dom('div','simple-result '+(kind==='correct'?'simple-correct':'simple-wrong'),
+    kind==='correct'?'ВЕРНО!':'НЕВЕРНО!'));
+  document.body.classList.add('result-preview');
+  resultEffectTimer=setTimeout(clearResult,850);
+}
 function handleEffect(e){
   lastEffect=e;
   if(e.kind!=='correct'&&e.kind!=='wrong')return;
-  clearTimeout(resultEffectTimer);
-  const layer=$('flashLayer');
-  layer.replaceChildren(dom('div','simple-result '+(e.kind==='correct'?'simple-correct':'simple-wrong'),
-    e.kind==='correct'?'ВЕРНО!':'НЕВЕРНО!'));
-  document.body.classList.add('result-preview');
-  resultEffectTimer=setTimeout(()=>{
-    layer.replaceChildren();
-    document.body.classList.remove('result-preview');
-  },1300);
+  if(pendingResult&&pendingResult.kind===e.kind){pendingResult=null;return;}
+  pendingResult=null;
+  showResult(e.kind);
+}
+function scoreWithFeedback(kind){
+  if(keyBusy)return Promise.resolve(false);
+  keyBusy=true;
+  pendingResult={kind,at:Date.now()};
+  showResult(kind);
+  return send({type:kind}).then(ok=>{
+    if(!ok){clearResult();pendingResult=null;}
+    return ok;
+  }).finally(()=>{keyBusy=false;});
 }
 function renderControl(){
   const a=state.active,q=a&&state.questions.find(q=>q.id===a.questionId);
@@ -378,8 +411,8 @@ function renderSettings(){
     row.append(btn);members.append(row);
   }
 }
-$('correctBtn').onclick=()=>send({type:'correct'});
-$('wrongBtn').onclick=()=>send({type:'wrong'});
+$('correctBtn').onclick=()=>scoreWithFeedback('correct');
+$('wrongBtn').onclick=()=>scoreWithFeedback('wrong');
 $('skipBtn').onclick=()=>send({type:'skip'});
 $('revealBtn').onclick=()=>send({type:'reveal'});
 $('closeBtn').onclick=()=>send({type:'close'});
@@ -394,6 +427,7 @@ $('logoutBtn').onclick=async()=>{await request('/api/logout',{});document.body.c
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   activeTab=b.dataset.tab;document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===activeTab));
   ['Control','Editor','Settings'].forEach(n=>document.getElementById('tab'+n).classList.toggle('hidden',n.toLowerCase()!==activeTab));
+  refreshHostPanel();
 });
 function updateTimer(){
   if(!state?.active?.timerEnd){$('timerPill').classList.add('hidden');$('stageClockTrack').classList.add('hidden');return;}
@@ -403,5 +437,5 @@ function updateTimer(){
   $('stageClockFill').style.width=Math.min(100,Math.max(0,((state.active.timerEnd-Date.now())/30000)*100))+'%';
   setText('timerNum',remain);
 }
-setInterval(updateTimer,250);
+setInterval(()=>{if(state?.active?.timerEnd)updateTimer();},250);
 connect();

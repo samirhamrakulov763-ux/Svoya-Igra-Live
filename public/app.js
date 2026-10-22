@@ -235,13 +235,11 @@ function animateNumber(node,start,end){
 function renderHostRoster(){
   const root=$('rosterList');root.replaceChildren();
   const players=[...state.players].sort((a,b)=>b.score-a.score||a.joinedAt-b.joinedAt);
-  setText('rosterCount',players.length);
   if(!players.length){root.append(dom('div','roster-empty','Ожидаем подключения игроков'));return;}
   for(const [i,p] of players.entries()){
     const active=state.active?.playerId===p.id&&!state.active?.finished&&!state.active?.reveal;
     const pending=(state.active?.buzzQueue||[]).indexOf(p.id)>=0;
     const row=dom('div','roster-player'+(active?' roster-active':'')+(pending?' roster-queued':''));
-    row.append(dom('span','roster-rank',String(i+1).padStart(2,'0')));
     row.append(dom('span','roster-name',p.name));
     row.append(dom('span','roster-score',fmt(p.score)));
     root.append(row);
@@ -286,21 +284,19 @@ function renderScoreboard(prev){
   });
   lastScores=new Map(state.players.map(p=>[p.id,p.score]));
 }
+let resultEffectTimer=null;
 function handleEffect(e){
   lastEffect=e;
-  if(e.kind==='correct'||e.kind==='wrong'){
-    const good=e.kind==='correct';
-    const layer=$('flashLayer');layer.replaceChildren();
-    const curtain=dom('div','effect-curtain'+(good?'':' red'));
-    const content=dom('div','effect-content'+(good?'':' red'));
-    content.append(dom('div','effect-symbol',good?'✓':'✕'));
-    content.append(dom('div','effect-title',good?'ВЕРНО!':'НЕВЕРНО!'));
-    content.append(dom('div','effect-sub',(e.name||'ИГРОК').toUpperCase()+'  '+(e.delta>0?'+':'')+fmt(e.delta)));
-    if(!good)content.append(dom('div','effect-sub',e.nextName?'СЛЕДУЮЩИЙ: '+e.nextName.toUpperCase():'ОЖИДАЕМ НОВОГО НАЖАТИЯ'));
-    layer.append(curtain,content);setTimeout(()=>{if(layer.contains(content))layer.replaceChildren();},1750);
-  }else if(e.kind==='join'){toast('К игре присоединился '+e.name);}
-  else if(e.kind==='round')toast('Раунд '+e.round+' начинается!');
-  else if(e.kind==='undo')toast('Последнее изменение отменено');
+  if(e.kind!=='correct'&&e.kind!=='wrong')return;
+  clearTimeout(resultEffectTimer);
+  const layer=$('flashLayer');
+  layer.replaceChildren(dom('div','simple-result '+(e.kind==='correct'?'simple-correct':'simple-wrong'),
+    e.kind==='correct'?'ВЕРНО!':'НЕВЕРНО!'));
+  document.body.classList.add('result-preview');
+  resultEffectTimer=setTimeout(()=>{
+    layer.replaceChildren();
+    document.body.classList.remove('result-preview');
+  },1300);
 }
 function renderControl(){
   const a=state.active,q=a&&state.questions.find(q=>q.id===a.questionId);
@@ -409,24 +405,3 @@ function updateTimer(){
 }
 setInterval(updateTimer,250);
 connect();
-
-
-// Broadcast finale: particle choreography, layered over the existing score animations.
-const _handleScoreEffect=handleEffect;
-handleEffect=function(effect){
-  _handleScoreEffect(effect);
-  if(effect.kind!=='correct'&&effect.kind!=='wrong')return;
-  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  const colors=effect.kind==='correct'?['#fbe5ab','#ffc968','#e5a751','#9de8da','#ffffff']:['#ff9ba2','#fa647b','#f8c0c4','#c24a68'];
-  const count=effect.kind==='correct'?44:24;
-  const layer=$('flashLayer');
-  for(let i=0;i<count;i++){
-    const particle=dom('span','celebration-particle');
-    const x=10+Math.random()*80;
-    const y=18+Math.random()*60;
-    const dx=Math.round((Math.random()-.5)*550);
-    const dy=Math.round((Math.random()-.62)*460);
-    particle.style.cssText='--x:'+x+'%;--y:'+y+'%;--s:'+(3+Math.random()*5)+'px;--c:'+colors[i%colors.length]+';--r:'+Math.round(Math.random()*360)+'deg;--dx:'+dx+'px;--dy:'+dy+'px;animation-delay:'+(Math.random()*.2).toFixed(2)+'s';
-    layer.append(particle);
-  }
-};

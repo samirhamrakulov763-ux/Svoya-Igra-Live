@@ -840,11 +840,16 @@ body.panel-expanded .host-panel textarea{min-height:150px!important;resize:verti
   line-height:1.2!important;padding-top:14px;margin:0 auto!important;
 }
 .question-stage.answer-view .stage-question-image{display:none!important;}
-/* Simple reveal for a surprise question, no particles. */
-.question-stage.surprise-opening .question-value{animation:surpriseValueIn .55s ease-out both!important;}
+/* Larger, expressive surprise reveal — scale and fade only, no particles. */
+.question-stage.surprise-opening .question-value{
+  animation:surpriseValueIn 1.45s cubic-bezier(.22,1,.36,1) both!important;
+  transform-origin:center center!important;
+}
 @keyframes surpriseValueIn{
-  0%{opacity:0;transform:scale(.9)}
-  70%{opacity:1;transform:scale(1.03)}
+  0%{opacity:0;transform:scale(.35)}
+  35%{opacity:1;transform:scale(1.34)}
+  57%{opacity:1;transform:scale(.92)}
+  73%{opacity:1;transform:scale(1.07)}
   100%{opacity:1;transform:scale(1)}
 }
 .image-editor-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;}
@@ -871,7 +876,7 @@ body.panel-expanded .host-panel textarea{min-height:150px!important;resize:verti
 /* Final presentation refinements: crisp answer, legible photo caption, stable expanded drawer. */
 .question-stage.answer-view .answer-text:not(.hidden){
   animation:none!important;filter:none!important;backdrop-filter:none!important;
-  transform:none!important;opacity:1!important;border-radius:0!important;
+  transform:none!important;opacity:1!important;border-radius:22px!important;
 }
 .question-stage.photo-with-text:not(.answer-view) .question-text:not(.hidden){
   width:min(1100px,90vw)!important;max-width:min(1100px,90vw)!important;
@@ -883,3 +888,33 @@ body.panel-expanded .host-panel textarea{min-height:150px!important;resize:verti
   max-height:min(37dvh,365px)!important;
 }
 body.panel-expanded .host-panel{right:16px!important;left:auto!important;box-sizing:border-box!important;}
+
+
+/* Surprise content follows the enlarged title with a clean scale-in. */
+.question-stage.surprise-opening:not(.answer-view) .question-text:not(.hidden),
+.question-stage.surprise-opening:not(.answer-view) .stage-question-image:not(.hidden) {
+  animation:surpriseContentIn 1.2s cubic-bezier(.22,1,.36,1) both!important;
+  transform-origin:center center!important;
+}
+@keyframes surpriseContentIn {
+  0%,12%{opacity:0;transform:translateY(28px) scale(.82)}
+  63%{opacity:1;transform:translateY(-5px) scale(1.06)}
+  100%{opacity:1;transform:translateY(0) scale(1)}
+}
+@media (min-width:741px) and (min-height:551px) {
+  .question-stage.surprise-opening:not(.answer-view) .question-text:not(.hidden) {
+    animation:surpriseTextCentered 1.2s cubic-bezier(.22,1,.36,1) both!important;
+  }
+  @keyframes surpriseTextCentered {
+    0%,12%{opacity:0;transform:translateY(calc(-9vh + 25px)) scale(.82)}
+    63%{opacity:1;transform:translateY(calc(-9vh - 5px)) scale(1.06)}
+    100%{opacity:1;transform:translateY(-9vh) scale(1)}
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  .question-stage.surprise-opening .question-value,
+  .question-stage.surprise-opening:not(.answer-view) .question-text:not(.hidden),
+  .question-stage.surprise-opening:not(.answer-view) .stage-question-image:not(.hidden) {
+    animation:none!important;
+  }
+}

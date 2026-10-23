@@ -234,7 +234,7 @@ function renderStage(){
     if(active.surprise){
       void stage.offsetWidth;
       stage.classList.add('surprise-opening');
-      setTimeout(()=>stage.classList.remove('surprise-opening'),600);
+      setTimeout(()=>stage.classList.remove('surprise-opening'),1600);
     }
   }
   const image=$('stageQuestionImage'),withImage=!!q.imageId;

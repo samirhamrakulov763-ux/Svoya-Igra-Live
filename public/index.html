@@ -37,7 +37,7 @@
             <div class="question-stage-top"><span class="q-top-label">ВОПРОС РАУНДА</span><span id="stageCategory">КАТЕГОРИЯ</span><span class="q-top-mark">✦</span></div>
             <div id="questionValue" class="question-value">300 <small>ОЧКОВ</small></div>
             <div class="question-divider"></div>
-            <div id="questionText" class="question-text"></div>
+            <img id="stageQuestionImage" class="stage-question-image hidden" alt="Изображение вопроса" decoding="sync"/><div id="questionText" class="question-text"></div>
             <div id="answerText" class="answer-text hidden"></div>
             <div id="activeAnswerer" class="active-answerer hidden" aria-live="polite"></div>
             <div id="buzzArea" class="buzz-area hidden"><button type="button" id="buzzBtn" class="buzz-btn">⚡ ОТВЕТИТЬ ПЕРВЫМ</button><div id="buzzStatus" class="buzz-status">Нажми раньше остальных, чтобы получить право ответа</div></div>
@@ -48,7 +48,7 @@
           <div class="footer-note"><span>✦</span> СОЗДАНО ДЛЯ ЯРКИХ ИГР И БОЛЬШИХ ПОБЕД <span>✦</span></div>
         </main>
         <aside id="hostPanel" class="host-panel hidden">
-          <div class="panel-heading"><div class="panel-icon">♛</div><div><div class="panel-title">Пульт ведущего</div><div class="panel-sub">УПРАВЛЕНИЕ ЭФИРОМ <span class="host-label-mini">• CONTROL ROOM</span></div></div><button type="button" id="closeHostPanel" aria-label="Закрыть пульт" title="Закрыть пульт">×</button><span class="panel-online"></span></div>
+          <div class="panel-heading"><div class="panel-icon">♛</div><div><div class="panel-title">Пульт ведущего</div><div class="panel-sub">УПРАВЛЕНИЕ ЭФИРОМ <span class="host-label-mini">• CONTROL ROOM</span></div></div><button type="button" id="expandHostPanel" class="expand-host-panel" aria-label="Увеличить пульт" title="Увеличить пульт">⤢</button><button type="button" id="closeHostPanel" aria-label="Закрыть пульт" title="Закрыть пульт">×</button><span class="panel-online"></span></div>
           <div class="tab-bar"><button class="tab active" data-tab="control">Пульт</button><button class="tab" data-tab="editor">Редактор</button><button class="tab" data-tab="settings">Игра</button></div>
           <div id="tabControl" class="panel-body">
             <div class="panel-label">ТЕКУЩИЙ ВОПРОС <span id="currentState">НЕТ</span></div>
@@ -68,6 +68,10 @@
             <label class="field-label" for="editQuestion">Вопрос</label><select id="editQuestion" class="full-input"><option value="">Новый вопрос</option></select>
             <label class="field-label" for="editPoints">Стоимость вопроса</label><select id="editPoints" class="full-input"><option>100</option><option>200</option><option>300</option><option>400</option><option>500</option><option>600</option><option>700</option><option>800</option><option>900</option><option>1000</option></select>
             <label class="field-label" for="editText">Текст вопроса</label><textarea id="editText" placeholder="Напишите вопрос..." rows="4"></textarea>
+            <label class="field-label" for="editImageFile">Фото для вопроса</label>
+            <input id="editImageFile" type="file" accept="image/jpeg,image/png,image/webp" class="full-input"/>
+            <div class="image-editor-tools"><select id="editImageMode" class="full-input"><option value="image-only">Только фото</option><option value="image-text">Фото и вопрос снизу</option></select><button type="button" id="removeEditImage" class="action-btn">Удалить фото</button></div>
+            <img id="editImagePreview" class="edit-image-preview hidden" alt="Предпросмотр фото"/><div id="imageUploadStatus" class="editor-hint"></div>
             <label class="field-label" for="editAnswer">Правильный ответ (только для ведущего)</label><textarea id="editAnswer" placeholder="Введите правильный ответ..." rows="3"></textarea>
             <div class="editor-actions"><button id="saveQuestion" class="gold-btn wide">Сохранить вопрос</button><button id="newQuestion" class="action-btn">Новый</button><button id="deleteQuestion" class="action-btn danger-text">Удалить</button></div>
             <div class="editor-hint">Вопросы сохраняются автоматически на этом компьютере. Изменения сразу видны всем игрокам.</div>

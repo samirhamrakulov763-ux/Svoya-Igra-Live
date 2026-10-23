@@ -784,3 +784,102 @@ body.question-open.result-preview .simple-result{
 @media(max-width:460px){
   .player-switch-role{padding:10px 12px;font-size:13px}
 }
+
+
+/* Host drawer: scrollable and optionally expanded for editing large questions. */
+.host-panel{
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  overscroll-behavior:contain!important;
+  height:calc(100dvh - 32px)!important;
+  max-height:calc(100dvh - 32px)!important;
+  scrollbar-width:thin;
+}
+.host-panel .panel-body{max-height:none!important;overflow:visible!important;}
+.host-panel .tab-bar{position:sticky;top:64px;z-index:3;background:#10223d;}
+body.panel-expanded .host-panel{width:min(1080px,calc(100vw - 32px))!important;max-width:none!important;}
+body.panel-expanded .host-panel textarea{min-height:150px!important;resize:vertical;}
+.expand-host-panel{
+  margin-left:auto;flex:0 0 auto;border:0;border-radius:8px;
+  background:#245ba7;color:#fff;padding:5px 10px;
+  font:900 23px/1.2 sans-serif;cursor:pointer;
+}
+#closeHostPanel{margin-left:0!important;flex:0 0 auto;}
+/* Correct answer: one plain yellow rectangle, no lines, borders or ornament. */
+.question-stage.answer-view .answer-text:not(.hidden){
+  grid-column:1!important;grid-row:3!important;
+  width:auto!important;min-width:min(420px,85vw)!important;
+  max-width:min(1220px,94vw)!important;
+  padding:26px clamp(26px,5vw,64px)!important;
+  background:#ffcf28!important;color:#0b337a!important;
+  border:0!important;border-radius:9px!important;
+  outline:0!important;box-shadow:none!important;text-shadow:none!important;
+  font:900 clamp(40px,7vw,105px)/1.16 Manrope,'Segoe UI',sans-serif!important;
+  text-align:center!important;overflow-wrap:anywhere;
+}
+.question-stage.answer-view .answer-text:before,
+.question-stage.answer-view .answer-text:after{display:none!important;}
+/* Preloaded photo: either alone or with question directly underneath. */
+.stage-question-image.hidden{display:none!important;}
+.stage-question-image{
+  grid-column:1;grid-row:3;align-self:center;justify-self:center;
+  max-width:min(1200px,92vw);max-height:min(57dvh,560px);
+  width:auto;height:auto;object-fit:contain;border:0;box-shadow:none;border-radius:6px;
+}
+.question-stage.photo-stage:not(.answer-view) .question-text.hidden{display:none!important;}
+.question-stage.photo-with-text:not(.answer-view){
+  grid-template-rows:minmax(32px,auto) minmax(90px,auto) minmax(0,1fr) auto auto!important;
+}
+.question-stage.photo-with-text:not(.answer-view) .stage-question-image{
+  grid-row:3;max-height:min(42dvh,400px);align-self:center!important;
+}
+.question-stage.photo-with-text:not(.answer-view) .question-text:not(.hidden){
+  grid-row:4;align-self:center!important;justify-self:center!important;
+  transform:none!important;animation:none!important;
+  font-size:clamp(22px,3.1vw,47px)!important;
+  line-height:1.2!important;padding-top:14px;margin:0 auto!important;
+}
+.question-stage.answer-view .stage-question-image{display:none!important;}
+/* Simple reveal for a surprise question, no particles. */
+.question-stage.surprise-opening .question-value{animation:surpriseValueIn .55s ease-out both!important;}
+@keyframes surpriseValueIn{
+  0%{opacity:0;transform:scale(.9)}
+  70%{opacity:1;transform:scale(1.03)}
+  100%{opacity:1;transform:scale(1)}
+}
+.image-editor-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;}
+.image-editor-tools .full-input{flex:1;min-width:165px;}
+.edit-image-preview.hidden{display:none!important;}
+.edit-image-preview{
+  display:block;max-width:100%;max-height:290px;object-fit:contain;
+  border:0;border-radius:9px;margin:12px auto;
+}
+@media(max-width:640px){
+  .question-stage.answer-view .answer-text:not(.hidden){
+    min-width:0!important;max-width:96vw!important;
+    padding:18px 19px!important;font-size:clamp(34px,9vw,60px)!important;
+  }
+  .stage-question-image{max-width:94vw;max-height:46dvh;}
+  .question-stage.photo-with-text:not(.answer-view) .stage-question-image{max-height:30dvh;}
+  .host-panel .tab-bar{top:60px;}
+}
+@media(prefers-reduced-motion:reduce){
+  .question-stage.surprise-opening .question-value{animation:none!important;}
+}
+
+
+/* Final presentation refinements: crisp answer, legible photo caption, stable expanded drawer. */
+.question-stage.answer-view .answer-text:not(.hidden){
+  animation:none!important;filter:none!important;backdrop-filter:none!important;
+  transform:none!important;opacity:1!important;border-radius:0!important;
+}
+.question-stage.photo-with-text:not(.answer-view) .question-text:not(.hidden){
+  width:min(1100px,90vw)!important;max-width:min(1100px,90vw)!important;
+  white-space:normal!important;overflow-wrap:anywhere!important;
+  text-wrap:balance!important;font-size:clamp(21px,2.85vw,43px)!important;
+  padding-bottom:10px!important;
+}
+.question-stage.photo-with-text:not(.answer-view) .stage-question-image{
+  max-height:min(37dvh,365px)!important;
+}
+body.panel-expanded .host-panel{right:16px!important;left:auto!important;box-sizing:border-box!important;}

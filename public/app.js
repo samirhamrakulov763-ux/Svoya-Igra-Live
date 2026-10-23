@@ -7,6 +7,26 @@ let myId=localStorage.getItem('svo_player_id')||'';
 let myToken=localStorage.getItem('svo_player_token')||'';
 let lastScores=new Map(),isFirstRender=true,modalDismissed=false,lastDecisionKeyAt=0,keyBusy=false,redBusy=false;
 let boardSignature='',rosterSignature='',pendingResult=null;
+const imageCache=new Map();
+function imageUrl(id){return '/media/'+encodeURIComponent(id);}
+function preloadImage(id){
+  if(!id)return Promise.resolve(false);
+  if(!imageCache.has(id)){
+    const img=new Image();
+    img.loading='eager';img.decoding='sync';
+    const ready=new Promise(resolve=>{
+      img.onload=()=>{if(img.decode)img.decode().catch(()=>{});resolve(true);};
+      img.onerror=()=>resolve(false);
+    });
+    img.src=imageUrl(id);
+    imageCache.set(id,{img,ready});
+  }
+  return imageCache.get(id).ready;
+}
+function preloadHostImages(){
+  if(!state?.host)return;
+  for(const q of state.questions)if(q.imageId)preloadImage(q.imageId);
+}
 const setText=(id,value)=>{const node=$(id),next=String(value);if(node.textContent!==next)node.textContent=next;};
 const all=['100','200','300','400','500'];
 function toast(message,error=false){
@@ -71,6 +91,11 @@ $('menuToggle').onclick=()=>{
   const shown=document.body.classList.toggle('menu-open');$('menuToggle').setAttribute('aria-expanded',String(shown));
 };
 $('closeHostPanel').onclick=()=>document.body.classList.remove('panel-open');
+$('expandHostPanel').onclick=()=>{
+  const big=document.body.classList.toggle('panel-expanded');
+  $('expandHostPanel').textContent=big?'⤡':'⤢';
+  $('expandHostPanel').title=big?'Уменьшить пульт':'Увеличить пульт';
+};
 $('stageCategory').onclick=()=>{if(state?.host&&state?.active)toggleHostPanel();};
 $('stageCategory').title='Ведущий: нажмите здесь, чтобы открыть пульт';
 document.addEventListener('click',e=>{
@@ -160,6 +185,7 @@ function render(next){
   $('blankLayer').classList.toggle('hidden',!state.blank);
   $('playerConsole').classList.toggle('hidden',!playerOnly);
   $('hostRoster').classList.toggle('hidden',!host);
+  if(host)preloadHostImages();
   renderBoard();renderStage();
   if(host)renderHostRoster();
   renderRedBuzzer();
@@ -189,7 +215,7 @@ function renderBoard(){
       tile.type='button';tile.disabled=!state.host||!q||q.used||!!state.active;
       tile.title=q?(state.host?(q.id===state.surpriseQuestionId?'СЮРПРИЗ · ':'')+q.text:'Вопрос '+pts+' очков'):'Вопрос не добавлен';
       if(q){tile.append(dom('span','',fmt(pts)));}
-      if(state.host&&q&&!q.used)tile.onclick=()=>send({type:'open',questionId:q.id});
+      if(state.host&&q&&!q.used)tile.onclick=async()=>{if(q.imageId)await preloadImage(q.imageId);await send({type:'open',questionId:q.id});};
       col.append(tile);
     }
     board.append(col);
@@ -199,13 +225,30 @@ function renderBoard(){
 function renderStage(){
   const stage=$('questionStage'),active=state.active,area=document.querySelector('.play-area');
   const q=active&&state.questions.find(q=>q.id===active.questionId);
-  if(!q){stage.classList.add('hidden');stage.classList.remove('answer-view');area.classList.remove('in-question');document.body.classList.remove('question-open');lastQuestionId='';return;}
+  if(!q){stage.classList.add('hidden');stage.classList.remove('answer-view','photo-stage','photo-with-text','surprise-opening');$('stageQuestionImage').classList.add('hidden');area.classList.remove('in-question');document.body.classList.remove('question-open');lastQuestionId='';return;}
   const change=lastQuestionId!==q.id;
   stage.classList.remove('hidden');stage.classList.toggle('answer-view',!!active.reveal);area.classList.add('in-question');document.body.classList.add('question-open');
-  if(change)lastQuestionId=q.id;
+  if(change){
+    lastQuestionId=q.id;
+    stage.classList.remove('surprise-opening');
+    if(active.surprise){
+      void stage.offsetWidth;
+      stage.classList.add('surprise-opening');
+      setTimeout(()=>stage.classList.remove('surprise-opening'),600);
+    }
+  }
+  const image=$('stageQuestionImage'),withImage=!!q.imageId;
+  stage.classList.toggle('photo-stage',withImage);
+  stage.classList.toggle('photo-with-text',withImage&&q.imageMode==='image-text');
+  image.classList.toggle('hidden',!withImage||!!active.reveal);
+  if(withImage){
+    const u=imageUrl(q.imageId);
+    if(image.getAttribute('src')!==u)image.src=u;
+  }else image.removeAttribute('src');
+  $('questionText').classList.toggle('hidden',withImage&&q.imageMode!=='image-text');
   const cat=state.categories.find(c=>c.id===q.categoryId);
   setText('stageCategory',(cat?.name||'Категория').toUpperCase());
-  $('questionValue').textContent=active.surprise?(active.wager===null?'СЮРПРИЗ':'СТАВКА '+fmt(active.wager)):fmt(q.points);
+  setText('questionValue',active.surprise?(active.wager===null?'СЮРПРИЗ':'СТАВКА '+fmt(active.wager)):fmt(q.points));
   $('questionValue').classList.toggle('surprise-value',!!active.surprise);
   setText('questionText',q.text||'');
   const answer=$('answerText');
@@ -389,9 +432,17 @@ function scoreWithFeedback(kind){
   if(state?.active?.surprise && state.active.wager===null){toast('Дождитесь ставки игрока с телефона',true);return Promise.resolve(false);}
   keyBusy=true;
   pendingResult={kind,at:Date.now()};
-  showResult(kind);
+  // A correct answer opens instantly, without an intermediate effect or board jump.
+  const previousReveal=state.active?.reveal;
+  if(kind==='correct'&&state.active){
+    state.active.reveal=true;
+    renderStage();
+  }else showResult(kind);
   return send({type:kind}).then(ok=>{
-    if(!ok){clearResult();pendingResult=null;}
+    if(!ok){
+      clearResult();pendingResult=null;
+      if(kind==='correct'&&state.active){state.active.reveal=previousReveal;renderStage();}
+    }
     return ok;
   }).finally(()=>{keyBusy=false;});
 }
@@ -481,15 +532,24 @@ function renderEditorOptions(){
   if(!qs.value&&editorQuestionId){editorQuestionId='';clearEditor();}
   editingCategoryId=newCat;
 }
+let editorImageId=null,imageUploadBusy=false;
+function showEditorImage(id){
+  editorImageId=id||null;
+  const image=$('editImagePreview');
+  image.classList.toggle('hidden',!editorImageId);
+  if(editorImageId)image.src=imageUrl(editorImageId);else image.removeAttribute('src');
+}
 function clearEditor(){
   editorQuestionId='';$('editQuestion').value='';$('editPoints').value='100';$('editText').value='';$('editAnswer').value='';
+  $('editImageMode').value='image-only';$('editImageFile').value='';
+  setText('imageUploadStatus','');showEditorImage(null);
 }
 function fillEditor(){
   const q=state.questions.find(q=>q.id===$('editQuestion').value);
   editorQuestionId=q?.id||'';
   if(!q){clearEditor();return;}
   $('editPoints').value=String(q.points);
-  $('editText').value=q.text||'';$('editAnswer').value=q.answer||'';
+  $('editText').value=q.text||'';$('editAnswer').value=q.answer||'';$('editImageMode').value=q.imageMode||'image-only';showEditorImage(q.imageId);
 }
 $('editCategory').onchange=()=>{editingCategoryId=$('editCategory').value;editorQuestionId='';clearEditor();renderEditorOptions();};
 $('editQuestion').onchange=fillEditor;
@@ -497,10 +557,55 @@ $('newQuestion').onclick=clearEditor;
 $('addCategory').onclick=async()=>{const name=$('categoryName').value.trim();if(!name)return toast('Введите название категории',true);await send({type:'saveCategory',name});$('categoryName').value='';};
 $('renameCategory').onclick=()=>{const name=$('categoryName').value.trim();if(!name)return toast('Введите новое название',true);send({type:'saveCategory',id:$('editCategory').value,name});};
 $('deleteCategory').onclick=()=>{if(confirm('Удалить категорию вместе со всеми вопросами?'))send({type:'deleteCategory',id:$('editCategory').value});};
+async function compressImage(file){
+  if(!/^image\/(jpeg|png|webp)$/.test(file.type))throw Error('Допускаются JPEG, PNG или WebP');
+  if(file.size>15*1024*1024)throw Error('Исходное фото не должно превышать 15 МБ');
+  const url=URL.createObjectURL(file);
+  try{
+    const img=new Image();
+    await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('Невозможно открыть фото'));img.src=url;});
+    const scale=Math.min(1,1600/img.naturalWidth,1000/img.naturalHeight);
+    if(!Number.isFinite(scale)||scale<=0)throw Error('Неверный размер фотографии');
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.floor(img.naturalWidth*scale));
+    canvas.height=Math.max(1,Math.floor(img.naturalHeight*scale));
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    for(const quality of [.78,.62,.45]){
+      let data=canvas.toDataURL('image/webp',quality);
+      if(!data.startsWith('data:image/webp'))data=canvas.toDataURL('image/jpeg',quality);
+      if(data.length<2_500_000)return data;
+    }
+    throw Error('Фото слишком сложное для сжатия до 1,9 МБ');
+  }finally{URL.revokeObjectURL(url);}
+}
+$('editImageFile').onchange=async event=>{
+  const file=event.target.files?.[0];if(!file)return;
+  imageUploadBusy=true;$('saveQuestion').disabled=true;
+  setText('imageUploadStatus','Обрабатываем фото...');
+  try{
+    const dataUrl=await compressImage(file);
+    const uploaded=await request('/api/upload-image',{dataUrl});
+    showEditorImage(uploaded.imageId);
+    await preloadImage(uploaded.imageId);
+    setText('imageUploadStatus','Фото загружено и подготовлено к показу');
+  }catch(e){
+    setText('imageUploadStatus',e.message);toast(e.message,true);
+  }finally{
+    imageUploadBusy=false;$('saveQuestion').disabled=false;
+  }
+};
+$('removeEditImage').onclick=()=>{
+  showEditorImage(null);$('editImageFile').value='';setText('imageUploadStatus','Фото убрано из вопроса');
+};
 $('saveQuestion').onclick=async()=>{
   const categoryId=$('editCategory').value,text=$('editText').value.trim(),answer=$('editAnswer').value.trim(),points=Number($('editPoints').value);
-  if(!categoryId||!text||!answer)return toast('Заполните категорию, вопрос и ответ',true);
-  try{await request('/api/action',{type:'saveQuestion',id:editorQuestionId||undefined,categoryId,text,answer,points});toast('Вопрос сохранён');if(!editorQuestionId)clearEditor();}
+  const imageMode=$('editImageMode').value;
+  if(imageUploadBusy)return toast('Дождитесь завершения загрузки фото',true);
+  if(!categoryId||!answer||(!text&&!editorImageId)||(!text&&imageMode==='image-text'))
+    return toast('Заполните категорию, ответ и текст или добавьте фото',true);
+  try{await request('/api/action',{type:'saveQuestion',id:editorQuestionId||undefined,categoryId,text,answer,points,imageId:editorImageId,imageMode});toast('Вопрос сохранён');if(!editorQuestionId)clearEditor();}
   catch(e){toast(e.message,true);}
 };
 $('deleteQuestion').onclick=()=>{if(!editorQuestionId)return;if(confirm('Удалить выбранный вопрос?'))send({type:'deleteQuestion',id:editorQuestionId});};

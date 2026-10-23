@@ -7,6 +7,11 @@ const ROOT = __dirname, PUBLIC = path.join(ROOT,'public'), DATA = path.resolve(p
 const PORT = Number(process.env.PORT || 4173);
 fs.mkdirSync(DATA,{recursive:true});
 const CONFIG_FILE = path.join(DATA,'config.json'), STATE_FILE = path.join(DATA,'game.json');
+const IMAGE_DIR = path.join(DATA,'question-images');
+fs.mkdirSync(IMAGE_DIR,{recursive:true});
+const IMAGE_LIMIT=1_900_000;
+function validImageId(id){return typeof id==='string'&&/^[a-f0-9-]{36}\.(jpg|png|webp)$/.test(id);}
+function imagePath(id){if(!validImageId(id))fail(400,'Неверное имя изображения');return path.join(IMAGE_DIR,id);}
 const uuid = () => crypto.randomUUID();
 const pick = (a) => a[Math.floor(Math.random()*a.length)];
 const seeds = [
@@ -78,6 +83,7 @@ function publicState(host=false) {
     title:game.title,round:game.round,categories:game.categories,
     questions:game.questions.map(q=>({
       id:q.id,categoryId:q.categoryId,points:q.points,used:q.used,
+      ...(host||game.active?.questionId===q.id ? {imageId:q.imageId||null,imageMode:q.imageMode||'image-only'} : {}),
       ...(host||game.active?.questionId===q.id ? {text:q.text} : {}),
       ...(host||game.active?.reveal&&game.active?.questionId===q.id? {answer:q.answer}: {})
     })),
@@ -144,7 +150,7 @@ function action(body){
       const p=player(game.active.playerId),q=question(game.active.questionId);
       const delta=game.active.surprise?game.active.wager:q.points;
       if(!Number.isInteger(delta)||delta<0)fail(409,'Дождитесь ставки игрока с телефона');
-      p.score+=delta;q.used=true;game.active.finished=true;game.active.timerEnd=null;
+      p.score+=delta;q.used=true;game.active.finished=true;game.active.reveal=true;game.active.timerEnd=null;
       effect={kind:'correct',playerId:p.id,name:p.name,delta,score:p.score,at:Date.now()};break;
     }
     case 'wrong': {
@@ -260,11 +266,13 @@ function action(body){
       const category=game.categories.find(c=>c.id===body.categoryId);
       if(!category)fail(400,'Выберите категорию');
       const text=txt(body.text,800),answer=txt(body.answer,500),points=validatePoints(body.points);
-      if(!text||!answer)fail(400,'Заполните текст вопроса и ответ');
+      const imageId=body.imageId||null,imageMode=body.imageMode==='image-text'?'image-text':'image-only';
+      if(imageId&&!fs.existsSync(imagePath(imageId)))fail(400,'Фото не загружено');
+      if(!answer||(!text&&!imageId)||(!text&&imageMode==='image-text'))fail(400,'Добавьте ответ и текст или фото вопроса');
       const duplicate=game.questions.find(q=>q.categoryId===category.id&&q.points===points&&q.id!==body.id);
       if(duplicate)fail(400,'В этой категории вопрос такой стоимости уже есть');
-      if(body.id){const q=question(body.id);Object.assign(q,{categoryId:category.id,text,answer,points});}
-      else game.questions.push({id:uuid(),categoryId:category.id,points,text,answer,used:false});
+      if(body.id){const q=question(body.id);Object.assign(q,{categoryId:category.id,text,answer,points,imageId,imageMode});}
+      else game.questions.push({id:uuid(),categoryId:category.id,points,text,answer,imageId,imageMode,used:false});
       break;
     }
     case 'deleteQuestion': {
@@ -314,11 +322,11 @@ function action(body){
   }
   return effect;
 }
-async function readBody(req) {
+async function readBody(req,maxBytes=1024*1024) {
   let raw='';
   for await(const chunk of req){
     raw+=chunk;
-    if(raw.length>1024*1024)fail(413,'Слишком большой запрос');
+    if(Buffer.byteLength(raw,'utf8')>maxBytes)fail(413,'Слишком большой запрос');
   }
   try{return JSON.parse(raw||'{}');}catch{fail(400,'Некорректный JSON');}
 }
@@ -336,6 +344,18 @@ const server=http.createServer(async(req,res)=>{
       if(host!==req.headers.host)fail(403,'Недопустимый источник');
     }
     const pathname=new URL(req.url,'http://localhost').pathname;
+    if(req.method==='GET'&&pathname.startsWith('/media/')){
+      const id=pathname.slice(7);
+      if(!validImageId(id))fail(404,'Фото не найдено');
+      const permitted=isHost(req)||game.active&&game.questions.some(q=>q.id===game.active.questionId&&q.imageId===id);
+      if(!permitted)fail(403,'Фото ещё не открыто');
+      const f=imagePath(id);
+      if(!fs.existsSync(f))fail(404,'Фото отсутствует');
+      const type=id.endsWith('.png')?'image/png':id.endsWith('.webp')?'image/webp':'image/jpeg';
+      const stats=fs.statSync(f);
+      res.writeHead(200,{'Content-Type':type,'Content-Length':stats.size,'Cache-Control':'private, max-age=31536000, immutable','X-Content-Type-Options':'nosniff'});
+      return fs.createReadStream(f).pipe(res);
+    }
     if(req.method==='GET'&&pathname==='/api/state')return respond(res,200,publicState(isHost(req)));
     if(req.method==='GET'&&pathname==='/api/events'){
       res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-store, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'});
@@ -348,7 +368,22 @@ const server=http.createServer(async(req,res)=>{
       return;
     }
     if(req.method==='POST'){
-      const body=await readBody(req);
+      const body=await readBody(req,pathname==='/api/upload-image'?3_000_000:1024*1024);
+      if(pathname==='/api/upload-image'){
+        requireHost(req);
+        const m=/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(body.dataUrl||'');
+        if(!m)fail(400,'Допустимы только JPEG, PNG, WebP');
+        const bytes=Buffer.from(m[2],'base64');
+        if(!bytes.length||bytes.length>IMAGE_LIMIT)fail(413,'Фото должно быть меньше 1,9 МБ');
+        const type=m[1];
+        const valid=type==='image/png'?bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))
+          :type==='image/jpeg'?bytes.length>3&&bytes[0]===255&&bytes[1]===216&&bytes[2]===255
+          :bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP';
+        if(!valid)fail(400,'Неверный формат файла');
+        const id=uuid()+'.'+(type==='image/png'?'png':type==='image/webp'?'webp':'jpg');
+        fs.writeFileSync(imagePath(id),bytes,{flag:'wx'});
+        return respond(res,200,{ok:true,imageId:id});
+      }
       if(pathname==='/api/login'){
         const key=loginKey(req),now=Date.now();
         const failed=loginFailures.get(key)||{count:0,until:0};

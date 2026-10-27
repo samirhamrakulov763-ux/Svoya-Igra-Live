@@ -84,6 +84,7 @@ function publicState(host=false) {
     questions:game.questions.map(q=>({
       id:q.id,categoryId:q.categoryId,points:q.points,used:q.used,
       ...(host||game.active?.questionId===q.id ? {imageId:q.imageId||null,imageMode:q.imageMode||'image-only'} : {}),
+      ...(host||game.active?.reveal&&game.active?.questionId===q.id ? {answerImageId:q.answerImageId||null,answerImageMode:q.answerImageMode||'image-text'} : {}),
       ...(host||game.active?.questionId===q.id ? {text:q.text} : {}),
       ...(host||game.active?.reveal&&game.active?.questionId===q.id? {answer:q.answer}: {})
     })),
@@ -131,7 +132,7 @@ function action(body){
       const surprise=!game.surprisePlayed&&game.surpriseQuestionId===q.id;
       if(surprise)game.surprisePlayed=true;
       game.recent=null;
-      game.active={questionId:q.id,playerId:surprise?null:game.players.some(p=>p.id===body.playerId)?body.playerId:null,buzzQueue:[],triedIds:[],surprise,wager:null,reveal:false,finished:false,openedAt:Date.now(),timerEnd:null};
+      game.active={questionId:q.id,playerId:surprise?null:game.players.some(p=>p.id===body.playerId)?body.playerId:null,buzzQueue:[],buzzOrder:[],triedIds:[],surprise,wager:null,reveal:false,finished:false,openedAt:Date.now(),timerEnd:null};
       effect={kind:'open',questionId:q.id,points:q.points,at:Date.now()};
       break;
     }
@@ -142,6 +143,8 @@ function action(body){
       if((game.active.triedIds||[]).includes(p.id))fail(400,'Этот игрок уже отвечал неправильно');
       game.active.buzzQueue=(game.active.buzzQueue||[]).filter(id=>id!==p.id);
       game.active.playerId=p.id;
+      game.active.buzzOrder=game.active.buzzOrder||[];
+      if(!game.active.buzzOrder.includes(p.id))game.active.buzzOrder.push(p.id);
       effect={kind:'select',playerId:p.id,name:p.name,at:Date.now()};break;
     }
     case 'correct': {
@@ -267,12 +270,50 @@ function action(body){
       if(!category)fail(400,'Выберите категорию');
       const text=txt(body.text,800),answer=txt(body.answer,500),points=validatePoints(body.points);
       const imageId=body.imageId||null,imageMode=body.imageMode==='image-text'?'image-text':'image-only';
-      if(imageId&&!fs.existsSync(imagePath(imageId)))fail(400,'Фото не загружено');
-      if(!answer||(!text&&!imageId)||(!text&&imageMode==='image-text'))fail(400,'Добавьте ответ и текст или фото вопроса');
+      const answerImageId=body.answerImageId||null,answerImageMode=body.answerImageMode==='image-only'?'image-only':'image-text';
+      if(imageId&&!fs.existsSync(imagePath(imageId)))fail(400,'Фото вопроса не загружено');
+      if(answerImageId&&!fs.existsSync(imagePath(answerImageId)))fail(400,'Фото ответа не загружено');
+      if((!answer&&!answerImageId)||(!text&&!imageId)||(!text&&imageMode==='image-text')||(!answer&&answerImageMode==='image-text'))fail(400,'Добавьте вопрос и ответ: текст или фото');
       const duplicate=game.questions.find(q=>q.categoryId===category.id&&q.points===points&&q.id!==body.id);
       if(duplicate)fail(400,'В этой категории вопрос такой стоимости уже есть');
-      if(body.id){const q=question(body.id);Object.assign(q,{categoryId:category.id,text,answer,points,imageId,imageMode});}
-      else game.questions.push({id:uuid(),categoryId:category.id,points,text,answer,imageId,imageMode,used:false});
+      if(body.id){const q=question(body.id);Object.assign(q,{categoryId:category.id,text,answer,points,imageId,imageMode,answerImageId,answerImageMode});}
+      else game.questions.push({id:uuid(),categoryId:category.id,points,text,answer,imageId,imageMode,answerImageId,answerImageMode,used:false});
+      break;
+    }
+    case 'importPack': {
+      if(game.active)fail(409,'Закройте текущий вопрос перед импортом');
+      const pack=body.pack;
+      if(!pack||!Array.isArray(pack.categories)||pack.categories.length<1||pack.categories.length>10)
+        fail(400,'В наборе должно быть от 1 до 10 категорий');
+      const newCategories=[],newQuestions=[],names=new Set();
+      for(const cat of pack.categories){
+        const name=txt(cat.name,38);
+        if(!name||names.has(name.toLowerCase())||!Array.isArray(cat.questions)||cat.questions.length>30)
+          fail(400,'Некорректная категория вопросов');
+        names.add(name.toLowerCase());
+        const categoryId=uuid();newCategories.push({id:categoryId,name});
+        const pointsSeen=new Set();
+        for(const entry of cat.questions){
+          const points=validatePoints(entry.points),text=txt(entry.text,800),answer=txt(entry.answer,500);
+          const imageId=entry.imageId||null,answerImageId=entry.answerImageId||null;
+          const imageMode=entry.imageMode==='image-text'?'image-text':'image-only';
+          const answerImageMode=entry.answerImageMode==='image-only'?'image-only':'image-text';
+          if(pointsSeen.has(points))fail(400,'Стоимость вопросов в категории повторяется');
+          pointsSeen.add(points);
+          if(imageId&&!fs.existsSync(imagePath(imageId)))fail(400,'Фото вопроса не найдено');
+          if(answerImageId&&!fs.existsSync(imagePath(answerImageId)))fail(400,'Фото ответа не найдено');
+          if((!text&&!imageId)||(!text&&imageMode==='image-text')||
+             (!answer&&!answerImageId)||(!answer&&answerImageMode==='image-text'))
+            fail(400,'В наборе есть пустой вопрос или ответ');
+          newQuestions.push({id:uuid(),categoryId,points,text,answer,imageId,imageMode,
+            answerImageId,answerImageMode,used:false});
+        }
+      }
+      if(newQuestions.length<1||newQuestions.length>100)fail(400,'Набор содержит неверное число вопросов');
+      game.categories=newCategories;game.questions=newQuestions;
+      game.recent=null;game.round=1;game.history=[];
+      game.surpriseQuestionId=null;game.surprisePlayed=false;
+      effect={kind:'import',at:Date.now()};
       break;
     }
     case 'deleteQuestion': {
@@ -347,7 +388,8 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==='GET'&&pathname.startsWith('/media/')){
       const id=pathname.slice(7);
       if(!validImageId(id))fail(404,'Фото не найдено');
-      const permitted=isHost(req)||game.active&&game.questions.some(q=>q.id===game.active.questionId&&q.imageId===id);
+      const permitted=isHost(req)||game.active&&game.questions.some(q=>q.id===game.active.questionId&&(
+        q.imageId===id || (game.active.reveal&&q.answerImageId===id)));
       if(!permitted)fail(403,'Фото ещё не открыто');
       const f=imagePath(id);
       if(!fs.existsSync(f))fail(404,'Фото отсутствует');
@@ -429,11 +471,13 @@ const server=http.createServer(async(req,res)=>{
         if(!a||a.finished||a.reveal||game.blank)fail(409,'Сейчас нельзя отвечать');
         a.triedIds=a.triedIds||[];
         a.buzzQueue=a.buzzQueue||[];
+        a.buzzOrder=a.buzzOrder||[];
         if(a.triedIds.includes(p.id))fail(409,'Вы уже отвечали на этот вопрос');
         if(a.surprise&&a.playerId&&a.playerId!==p.id)fail(409,'На сюрприз отвечает только первый игрок');
         if(a.playerId===p.id)return respond(res,200,{ok:true,position:0});
         if(a.buzzQueue.includes(p.id))return respond(res,200,{ok:true,position:a.buzzQueue.indexOf(p.id)+1});
         let effect=null;
+        a.buzzOrder.push(p.id);
         if(!a.playerId){a.playerId=p.id;effect={kind:'select',playerId:p.id,name:p.name,at:Date.now()};}
         else a.buzzQueue.push(p.id);
         pushState(effect);

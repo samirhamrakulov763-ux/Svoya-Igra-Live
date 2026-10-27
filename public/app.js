@@ -25,7 +25,7 @@ function preloadImage(id){
 }
 function preloadHostImages(){
   if(!state?.host)return;
-  for(const q of state.questions)if(q.imageId)preloadImage(q.imageId);
+  for(const q of state.questions){if(q.imageId)preloadImage(q.imageId);if(q.answerImageId)preloadImage(q.answerImageId);}
 }
 const setText=(id,value)=>{const node=$(id),next=String(value);if(node.textContent!==next)node.textContent=next;};
 const all=['100','200','300','400','500'];
@@ -251,15 +251,22 @@ function renderStage(){
   setText('questionValue',active.surprise?(active.wager===null?'СЮРПРИЗ':'СТАВКА '+fmt(active.wager)):fmt(q.points));
   $('questionValue').classList.toggle('surprise-value',!!active.surprise);
   setText('questionText',q.text||'');
-  const answer=$('answerText');
-  const show=!!(active.reveal||state.host);
-  // У ведущего ответ скрыт в сцене до нажатия, но всегда доступен в панели.
-  answer.classList.toggle('hidden',!active.reveal);
-  setText('answerText',show&&active.reveal?(q.answer||''):'');
+  const answer=$('answerText'),answerContent=$('answerContent'),answerImage=$('stageAnswerImage');
+  const showAnswer=!!active.reveal,hasAnswerImage=!!q.answerImageId;
+  answerContent.classList.toggle('hidden',!showAnswer);
+  answerContent.classList.toggle('answer-has-image',hasAnswerImage);
+  answerContent.classList.toggle('answer-image-only',hasAnswerImage&&q.answerImageMode==='image-only');
+  answer.classList.toggle('hidden',!showAnswer||(hasAnswerImage&&q.answerImageMode==='image-only')||!q.answer);
+  answerImage.classList.toggle('hidden',!showAnswer||!hasAnswerImage);
+  if(showAnswer&&hasAnswerImage){
+    const url=imageUrl(q.answerImageId);
+    if(answerImage.getAttribute('src')!==url)answerImage.src=url;
+  }else answerImage.removeAttribute('src');
+  setText('answerText',showAnswer?(q.answer||''):'');
   const p=state.players.find(p=>p.id===active.playerId);
   const focused=$('activeAnswerer');
-  focused.classList.toggle('hidden',!state.host||!p||active.reveal||active.finished);
-  if(p)focused.textContent=p.name;
+  focused.classList.add('hidden');
+  renderBuzzLineup(active);
   setText('answeringText',active.finished?'ВОПРОС ЗАВЕРШЁН':p?'ОТВЕЧАЕТ: '+p.name.toUpperCase():'ВЕДУЩИЙ ВЫБИРАЕТ ИГРОКА');
   updateTimer();renderBuzz();
 }
@@ -290,6 +297,30 @@ function animateNumber(node,start,end){
   const step=now=>{if(!node.isConnected)return;const progress=Math.min(1,(now-startTime)/duration),ease=1-Math.pow(1-progress,3);
     node.textContent=fmt(Math.round(start+(end-start)*ease));if(progress<1)requestAnimationFrame(step);};
   requestAnimationFrame(step);
+}
+function renderBuzzLineup(active){
+  const root=$('buzzLineup');
+  const show=!!state.host&&!!active&&!active.reveal;
+  root.classList.toggle('hidden',!show);
+  if(!show){root.replaceChildren();return;}
+  const activeId=active.playerId,queue=active.buzzQueue||[],tried=active.triedIds||[];
+  const ordered=[...new Set([activeId,...queue,...(active.buzzOrder||[]),...tried].filter(Boolean))];
+  const byId=new Map(state.players.map(p=>[p.id,p]));
+  root.replaceChildren();
+  if(!ordered.length)return;
+  if(activeId&&byId.has(activeId)){
+    root.append(dom('div','buzz-lead',byId.get(activeId).name));
+  }
+  const others=ordered.filter(id=>id!==activeId&&byId.has(id));
+  if(others.length){
+    const list=dom('div','buzz-followers');
+    for(const [i,id] of others.entries()){
+      const name=byId.get(id).name;
+      const cell=dom('div','buzz-follower'+(tried.includes(id)?' buzz-tried':''),String(i+1)+'. '+name);
+      list.append(cell);
+    }
+    root.append(list);
+  }
 }
 function renderHostRoster(){
   const players=[...state.players].sort((a,b)=>b.score-a.score||a.joinedAt-b.joinedAt);
@@ -532,17 +563,25 @@ function renderEditorOptions(){
   if(!qs.value&&editorQuestionId){editorQuestionId='';clearEditor();}
   editingCategoryId=newCat;
 }
-let editorImageId=null,imageUploadBusy=false;
+let editorImageId=null,editorAnswerImageId=null,imageUploadBusy=false;
 function showEditorImage(id){
   editorImageId=id||null;
   const image=$('editImagePreview');
   image.classList.toggle('hidden',!editorImageId);
   if(editorImageId)image.src=imageUrl(editorImageId);else image.removeAttribute('src');
 }
+function showEditorAnswerImage(id){
+  editorAnswerImageId=id||null;
+  const el=$('editAnswerImagePreview');
+  el.classList.toggle('hidden',!editorAnswerImageId);
+  if(editorAnswerImageId)el.src=imageUrl(editorAnswerImageId);else el.removeAttribute('src');
+}
 function clearEditor(){
   editorQuestionId='';$('editQuestion').value='';$('editPoints').value='100';$('editText').value='';$('editAnswer').value='';
   $('editImageMode').value='image-only';$('editImageFile').value='';
+  $('editAnswerImageMode').value='image-text';$('editAnswerImageFile').value='';
   setText('imageUploadStatus','');showEditorImage(null);
+  setText('answerImageUploadStatus','');showEditorAnswerImage(null);
 }
 function fillEditor(){
   const q=state.questions.find(q=>q.id===$('editQuestion').value);
@@ -550,6 +589,7 @@ function fillEditor(){
   if(!q){clearEditor();return;}
   $('editPoints').value=String(q.points);
   $('editText').value=q.text||'';$('editAnswer').value=q.answer||'';$('editImageMode').value=q.imageMode||'image-only';showEditorImage(q.imageId);
+  $('editAnswerImageMode').value=q.answerImageMode||'image-text';showEditorAnswerImage(q.answerImageId);
 }
 $('editCategory').onchange=()=>{editingCategoryId=$('editCategory').value;editorQuestionId='';clearEditor();renderEditorOptions();};
 $('editQuestion').onchange=fillEditor;
@@ -599,16 +639,79 @@ $('editImageFile').onchange=async event=>{
 $('removeEditImage').onclick=()=>{
   showEditorImage(null);$('editImageFile').value='';setText('imageUploadStatus','Фото убрано из вопроса');
 };
+$('editAnswerImageFile').onchange=async event=>{
+  const file=event.target.files?.[0];if(!file)return;
+  imageUploadBusy=true;$('saveQuestion').disabled=true;
+  setText('answerImageUploadStatus','Обрабатываем фото ответа...');
+  try{
+    const uploaded=await request('/api/upload-image',{dataUrl:await compressImage(file)});
+    showEditorAnswerImage(uploaded.imageId);
+    await preloadImage(uploaded.imageId);
+    setText('answerImageUploadStatus','Фото ответа загружено');
+  }catch(err){setText('answerImageUploadStatus',err.message);toast(err.message,true);}
+  finally{imageUploadBusy=false;$('saveQuestion').disabled=false;}
+};
+$('removeEditAnswerImage').onclick=()=>{
+  showEditorAnswerImage(null);$('editAnswerImageFile').value='';setText('answerImageUploadStatus','Фото ответа удалено из вопроса');
+};
 $('saveQuestion').onclick=async()=>{
   const categoryId=$('editCategory').value,text=$('editText').value.trim(),answer=$('editAnswer').value.trim(),points=Number($('editPoints').value);
   const imageMode=$('editImageMode').value;
   if(imageUploadBusy)return toast('Дождитесь завершения загрузки фото',true);
-  if(!categoryId||!answer||(!text&&!editorImageId)||(!text&&imageMode==='image-text'))
-    return toast('Заполните категорию, ответ и текст или добавьте фото',true);
-  try{await request('/api/action',{type:'saveQuestion',id:editorQuestionId||undefined,categoryId,text,answer,points,imageId:editorImageId,imageMode});toast('Вопрос сохранён');if(!editorQuestionId)clearEditor();}
+  const answerImageMode=$('editAnswerImageMode').value;
+  if(!categoryId||(!answer&&!editorAnswerImageId)||(!text&&!editorImageId)||(!text&&imageMode==='image-text')||(!answer&&answerImageMode==='image-text'))
+    return toast('Добавьте вопрос и ответ: текст или фото',true);
+  try{await request('/api/action',{type:'saveQuestion',id:editorQuestionId||undefined,categoryId,text,answer,points,imageId:editorImageId,imageMode,answerImageId:editorAnswerImageId,answerImageMode});toast('Вопрос сохранён');if(!editorQuestionId)clearEditor();}
   catch(e){toast(e.message,true);}
 };
 $('deleteQuestion').onclick=()=>{if(!editorQuestionId)return;if(confirm('Удалить выбранный вопрос?'))send({type:'deleteQuestion',id:editorQuestionId});};
+
+$('importQuizPack').onclick=async()=>{
+  const file=$('quizPackFile').files?.[0];
+  if(!file)return toast('Выберите подготовленный JSON-набор',true);
+  if(file.size>4*1024*1024)return toast('Набор слишком большой (максимум 4 МБ)',true);
+  let pack;
+  try{pack=JSON.parse(await file.text());}
+  catch{return toast('Не удалось прочитать набор JSON',true);}
+  if(pack?.format!=='svoya-quiz-pack-v1'||!Array.isArray(pack.categories)){
+    return toast('Неверный формат набора вопросов',true);
+  }
+  const count=pack.categories.reduce((n,c)=>n+(Array.isArray(c.questions)?c.questions.length:0),0);
+  if(!confirm('Заменить все категории и вопросы набором «'+(pack.source||file.name)+'» ('+count+' вопросов)? Игроки и баллы сохранятся.'))return;
+  const button=$('importQuizPack');
+  button.disabled=true;
+  try{
+    let uploaded=0;
+    const data={categories:[]};
+    for(const cat of pack.categories){
+      const c={name:cat.name,questions:[]};
+      for(const q of cat.questions){
+        const row={points:q.points,text:q.text,answer:q.answer,
+          imageMode:q.imageMode||'image-only',answerImageMode:q.answerImageMode||'image-text'};
+        for(const [source,target] of [['imageData','imageId'],['answerImageData','answerImageId']]){
+          if(q[source]){
+            if(typeof q[source]!=='string'||q[source].length>2600000)
+              throw Error('Некорректный размер изображения в наборе');
+            const result=await request('/api/upload-image',{dataUrl:q[source]});
+            row[target]=result.imageId;
+            uploaded++;
+            setText('quizPackStatus','Загрузка изображений: '+uploaded+'...');
+          }
+        }
+        c.questions.push(row);
+      }
+      data.categories.push(c);
+    }
+    await request('/api/action',{type:'importPack',pack:data});
+    setText('quizPackStatus','Загружено '+count+' вопросов, '+uploaded+' изображений');
+    $('quizPackFile').value='';
+    boardSignature='';rosterSignature='';await reloadState();
+    toast('Набор вопросов загружен');
+  }catch(e){
+    setText('quizPackStatus','Ошибка: '+e.message);toast(e.message,true);
+  }finally{button.disabled=false;}
+};
+
 function renderSettings(){
   renderSurpriseSettings();
   if(document.activeElement!==$('titleInput'))$('titleInput').value=state.title;

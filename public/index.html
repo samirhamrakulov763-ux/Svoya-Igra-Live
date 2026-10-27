@@ -38,8 +38,8 @@
             <div id="questionValue" class="question-value">300 <small>ОЧКОВ</small></div>
             <div class="question-divider"></div>
             <img id="stageQuestionImage" class="stage-question-image hidden" alt="Изображение вопроса" decoding="sync"/><div id="questionText" class="question-text"></div>
-            <div id="answerText" class="answer-text hidden"></div>
-            <div id="activeAnswerer" class="active-answerer hidden" aria-live="polite"></div>
+            <div id="answerContent" class="answer-content hidden"><img id="stageAnswerImage" class="stage-answer-image hidden" alt="Изображение правильного ответа" decoding="sync"/><div id="answerText" class="answer-text hidden"></div></div>
+            <div id="activeAnswerer" class="active-answerer hidden" aria-live="polite"></div><div id="buzzLineup" class="buzz-lineup hidden" aria-live="polite"></div>
             <div id="buzzArea" class="buzz-area hidden"><button type="button" id="buzzBtn" class="buzz-btn">⚡ ОТВЕТИТЬ ПЕРВЫМ</button><div id="buzzStatus" class="buzz-status">Нажми раньше остальных, чтобы получить право ответа</div></div>
             <div class="question-foot"><span id="answeringText">ВЫБИРАЕМ ИГРОКА</span><div id="timerPill" class="timer-pill hidden">◷ <span id="timerNum">30</span> сек</div></div><div id="stageClockTrack" class="stage-clock-track hidden"><div id="stageClockFill"></div></div>
           </div>
@@ -73,8 +73,13 @@
             <div class="image-editor-tools"><select id="editImageMode" class="full-input"><option value="image-only">Только фото</option><option value="image-text">Фото и вопрос снизу</option></select><button type="button" id="removeEditImage" class="action-btn">Удалить фото</button></div>
             <img id="editImagePreview" class="edit-image-preview hidden" alt="Предпросмотр фото"/><div id="imageUploadStatus" class="editor-hint"></div>
             <label class="field-label" for="editAnswer">Правильный ответ (только для ведущего)</label><textarea id="editAnswer" placeholder="Введите правильный ответ..." rows="3"></textarea>
+            <label class="field-label" for="editAnswerImageFile">Фото для ответа</label>
+            <input id="editAnswerImageFile" class="full-input" type="file" accept="image/jpeg,image/png,image/webp"/>
+            <div class="image-editor-tools"><select id="editAnswerImageMode" class="full-input"><option value="image-text">Фото и текст ответа</option><option value="image-only">Только фото</option></select><button type="button" id="removeEditAnswerImage" class="action-btn">Удалить фото ответа</button></div>
+            <img id="editAnswerImagePreview" class="edit-image-preview hidden" alt="Предпросмотр фото ответа"/><div id="answerImageUploadStatus" class="editor-hint"></div>
             <div class="editor-actions"><button id="saveQuestion" class="gold-btn wide">Сохранить вопрос</button><button id="newQuestion" class="action-btn">Новый</button><button id="deleteQuestion" class="action-btn danger-text">Удалить</button></div>
-            <div class="editor-hint">Вопросы сохраняются автоматически на этом компьютере. Изменения сразу видны всем игрокам.</div>
+            <div class="panel-label with-space">ИМПОРТ НАБОРА ВОПРОСОВ И ОТВЕТОВ</div><input id="quizPackFile" type="file" accept=".json,application/json" class="full-input"/><button id="importQuizPack" type="button" class="action-btn full">Загрузить набор вопросов</button><div id="quizPackStatus" class="editor-hint">Заменяет категории и вопросы только после подтверждения. Игроки и баллы сохраняются.</div>
+            <div class="editor-hint">Вопросы сохраняются автоматически на сервере и сразу видны всем игрокам.</div>
           </div>
           <div id="tabSettings" class="panel-body hidden">
             <div class="panel-label">НАСТРОЙКИ КОМНАТЫ</div>
